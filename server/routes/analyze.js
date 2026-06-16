@@ -1,51 +1,44 @@
-const express = require("express");
-const { chat, stripJson } = require("../services/groq");
+import { Router } from "express";
+import { chat, stripJson } from "../services/groq.js";
 
-const router = express.Router();
+const router = Router();
 
-const SYSTEM = `You are an ATS (Applicant Tracking System) scoring engine.
-Analyze resumes against job descriptions and return structured JSON only. No markdown, no explanation.`;
+const SYSTEM = `You are a strict ATS scoring engine used by top companies. Return structured JSON only. No markdown, no explanation.`;
 
 router.post("/", async (req, res) => {
   const { resume, jobDescription } = req.body;
-
-  if (!resume || !jobDescription) {
+  if (!resume || !jobDescription)
     return res.status(400).json({ error: "resume and jobDescription are required" });
-  }
 
   const prompt = `
-Compare this resume against the job description and return a JSON object with this exact schema:
+You are a strict ATS scanner. Score this resume against the job description with calibrated honesty — most resumes should score 40-75. Only exceptional matches score above 80.
+
+Scoring rules:
+- Extract every technical skill, tool, language, framework, and requirement from the JD
+- A keyword only counts as "matched" if it explicitly appears in the resume (no assumed synonyms)
+- Missing critical/required JD keywords heavily penalize the score (−5 to −10 each)
+- Years of experience mismatches penalize score
+- Projects and skills that are irrelevant to the JD do not add points
+- Section scores reflect real gaps: a skills section missing 60% of JD tools should score 30-45, not 70
+- Grade: A=85+, B=70-84, C=55-69, D=40-54, F=below 40
+
+Return JSON:
 {
-  "score": <number 0-100>,
-  "grade": <"A" | "B" | "C" | "D" | "F">,
-  "summary": "2-3 sentence overall assessment",
-  "matched_keywords": ["keywords present in both resume and JD"],
-  "missing_keywords": ["important JD keywords absent from resume"],
-  "section_scores": {
-    "skills": <0-100>,
-    "experience": <0-100>,
-    "projects": <0-100>,
-    "education": <0-100>
-  },
-  "suggestions": [
-    {
-      "section": "Skills | Experience | Projects",
-      "issue": "what is weak",
-      "fix": "concrete rewrite or addition suggestion"
-    }
-  ]
+  "score": <0-100, calibrated strictly>,
+  "grade": <"A"|"B"|"C"|"D"|"F">,
+  "summary": "2-3 sentence honest assessment of fit, naming the biggest gap",
+  "matched_keywords": ["keywords explicitly present in both"],
+  "missing_keywords": ["important JD keywords absent from resume — be exhaustive"],
+  "section_scores": { "skills": <0-100>, "experience": <0-100>, "projects": <0-100>, "education": <0-100> },
+  "suggestions": [{ "section": "string", "issue": "specific gap or missing element", "fix": "concrete actionable fix" }]
 }
 
-Job Description:
-${jobDescription}
-
-Resume:
-${JSON.stringify(resume, null, 2)}
+Job Description: ${jobDescription}
+Resume: ${JSON.stringify(resume, null, 2)}
 `;
 
   try {
-    const raw = await chat(prompt, SYSTEM);
-    const result = JSON.parse(stripJson(raw));
+    const result = JSON.parse(stripJson(await chat(prompt, SYSTEM)));
     res.json(result);
   } catch (err) {
     console.error("Analyze error:", err);
@@ -53,4 +46,4 @@ ${JSON.stringify(resume, null, 2)}
   }
 });
 
-module.exports = router;
+export default router;

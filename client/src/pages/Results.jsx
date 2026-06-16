@@ -1,138 +1,227 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { CheckCircle, XCircle, ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
-import { useState } from "react";
+import { CheckCircle2, XCircle, ChevronDown, ChevronUp, ArrowRight, RotateCcw, Clock } from "lucide-react";
+import { useState, useEffect } from "react";
+
+const DURATIONS = [
+  { label: "15 min", minutes: 15, questions: 3, desc: "Quick screen" },
+  { label: "30 min", minutes: 30, questions: 5, desc: "Standard" },
+  { label: "1 hour", minutes: 60, questions: 8, desc: "Full loop round" },
+];
 
 function ScoreRing({ score }) {
-  const radius = 40;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (score / 100) * circumference;
-  const color = score >= 75 ? "#22c55e" : score >= 50 ? "#f59e0b" : "#ef4444";
+  const r = 52;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (score / 100) * circ;
+  const gradientId = "scoreGradient";
+  const [animate, setAnimate] = useState(false);
+  const [displayScore, setDisplayScore] = useState(0);
+
+  useEffect(() => {
+    setTimeout(() => setAnimate(true), 200);
+    // Count-up animation
+    let start = 0;
+    const step = score / 40;
+    const interval = setInterval(() => {
+      start += step;
+      if (start >= score) {
+        setDisplayScore(score);
+        clearInterval(interval);
+      } else {
+        setDisplayScore(Math.round(start));
+      }
+    }, 25);
+    return () => clearInterval(interval);
+  }, [score]);
 
   return (
-    <div className="relative w-28 h-28 flex items-center justify-center">
-      <svg className="absolute rotate-[-90deg]" width="112" height="112">
-        <circle cx="56" cy="56" r={radius} stroke="#e4e4e7" strokeWidth="8" fill="none" className="dark:stroke-zinc-800" />
-        <circle
-          cx="56" cy="56" r={radius}
-          stroke={color} strokeWidth="8" fill="none"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
+    <div className="relative w-36 h-36 flex items-center justify-center">
+      {/* Glow */}
+      <div
+        className="absolute inset-0 rounded-full"
+        style={{
+          background: score >= 75
+            ? 'radial-gradient(circle, rgba(34, 197, 94, 0.15) 0%, transparent 70%)'
+            : score >= 50
+              ? 'radial-gradient(circle, rgba(245, 158, 11, 0.15) 0%, transparent 70%)'
+              : 'radial-gradient(circle, rgba(239, 68, 68, 0.15) 0%, transparent 70%)',
+          filter: 'blur(10px)',
+        }}
+      />
+      <svg className="-rotate-90 absolute" width="144" height="144">
+        <defs>
+          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={score >= 75 ? "#22c55e" : score >= 50 ? "#f59e0b" : "#ef4444"} />
+            <stop offset="100%" stopColor={score >= 75 ? "#06b6d4" : score >= 50 ? "#f97316" : "#ec4899"} />
+          </linearGradient>
+        </defs>
+        <circle cx="72" cy="72" r={r} strokeWidth="6" fill="none"
+          style={{ stroke: 'var(--border-subtle)' }} />
+        <circle cx="72" cy="72" r={r} stroke={`url(#${gradientId})`} strokeWidth="6" fill="none"
+          strokeDasharray={circ}
+          strokeDashoffset={animate ? offset : circ}
           strokeLinecap="round"
-          style={{ transition: "stroke-dashoffset 0.8s ease" }}
+          style={{
+            transition: 'stroke-dashoffset 1.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            filter: 'drop-shadow(0 0 8px rgba(139, 92, 246, 0.3))',
+          }}
         />
       </svg>
-      <div className="text-center">
-        <div className="text-2xl font-bold" style={{ color }}>{score}</div>
-        <div className="text-xs text-zinc-400">/100</div>
+      <div className="text-center relative z-10">
+        <div className="text-4xl font-bold tabular-nums gradient-text">{displayScore}</div>
+        <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>/ 100</div>
       </div>
     </div>
   );
 }
 
-function Pill({ label, variant }) {
-  const styles = {
-    green: "bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400",
-    red: "bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400",
-  };
+function Bar({ label, score }) {
+  const [animate, setAnimate] = useState(false);
+  useEffect(() => { setTimeout(() => setAnimate(true), 300); }, []);
+
+  const color = score >= 75
+    ? 'linear-gradient(90deg, #22c55e, #06b6d4)'
+    : score >= 50
+      ? 'linear-gradient(90deg, #f59e0b, #f97316)'
+      : 'linear-gradient(90deg, #ef4444, #ec4899)';
+
   return (
-    <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium ${styles[variant]}`}>
-      {variant === "green" ? <CheckCircle size={11} /> : <XCircle size={11} />}
+    <div className="flex items-center gap-3 text-sm">
+      <span className="w-24 text-xs capitalize shrink-0" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--border-subtle)' }}>
+        <div
+          className="h-full rounded-full transition-all duration-1000 ease-out"
+          style={{
+            width: animate ? `${score}%` : '0%',
+            background: color,
+            boxShadow: `0 0 8px ${score >= 75 ? 'rgba(34, 197, 94, 0.3)' : score >= 50 ? 'rgba(245, 158, 11, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+          }}
+        />
+      </div>
+      <span className="text-xs font-semibold tabular-nums w-7 text-right" style={{ color: 'var(--text-primary)' }}>{score}</span>
+    </div>
+  );
+}
+
+function Keyword({ label, matched }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-medium transition-all duration-200"
+      style={{
+        background: matched ? 'var(--success-glow)' : 'var(--danger-glow)',
+        color: matched ? 'var(--success)' : 'var(--danger)',
+        border: `1px solid ${matched ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+      }}
+    >
+      {matched ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
       {label}
     </span>
   );
 }
 
-function SectionBar({ label, score }) {
-  const color = score >= 75 ? "bg-green-500" : score >= 50 ? "bg-amber-400" : "bg-red-400";
-  return (
-    <div className="flex items-center gap-3">
-      <span className="text-xs text-zinc-500 dark:text-zinc-400 w-24 shrink-0">{label}</span>
-      <div className="flex-1 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${color} transition-all duration-700`} style={{ width: `${score}%` }} />
-      </div>
-      <span className="text-xs font-medium w-8 text-right">{score}</span>
-    </div>
-  );
-}
+const gradeColors = {
+  A: 'var(--success)',
+  B: '#10b981',
+  C: 'var(--warning)',
+  D: '#f97316',
+  F: 'var(--danger)',
+};
 
 export default function Results() {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [selectedDuration, setSelectedDuration] = useState(DURATIONS[1]); // 30 min default
 
-  if (!state?.atsResult) {
-    navigate("/");
-    return null;
-  }
-
+  if (!state?.atsResult) { navigate("/"); return null; }
   const { atsResult, resume, jobDescription } = state;
 
-  const gradeColor = {
-    A: "text-green-500", B: "text-emerald-500",
-    C: "text-amber-500", D: "text-orange-500", F: "text-red-500",
-  };
-
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">ATS Results</h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{atsResult.summary}</p>
+    <div className="max-w-2xl mx-auto space-y-5">
+
+      {/* Header */}
+      <div className="flex items-start justify-between fade-in-up stagger-1">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">ATS Report</h1>
+          <p className="text-sm mt-2 max-w-md leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{atsResult.summary}</p>
+        </div>
+        <button
+          onClick={() => navigate("/")}
+          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200 mt-1"
+          style={{ color: 'var(--text-muted)' }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-card-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+        >
+          <RotateCcw size={12} /> New
+        </button>
       </div>
 
-      {/* Score card */}
-      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 flex items-center gap-8">
+      {/* Score + sections */}
+      <div className="glass-card-static p-7 flex items-center gap-10 fade-in-up stagger-2" style={{ borderStyle: 'solid' }}>
         <ScoreRing score={atsResult.score} />
-        <div className="space-y-3 flex-1">
-          <div className="flex items-baseline gap-2">
-            <span className={`text-4xl font-bold ${gradeColor[atsResult.grade]}`}>{atsResult.grade}</span>
-            <span className="text-sm text-zinc-400">grade</span>
+        <div className="flex-1 space-y-3">
+          <div className="flex items-baseline gap-3 mb-4">
+            <span className="text-6xl font-bold tracking-tight" style={{ color: gradeColors[atsResult.grade] }}>{atsResult.grade}</span>
+            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>grade</span>
           </div>
-          <div className="space-y-2">
-            {Object.entries(atsResult.section_scores).map(([key, val]) => (
-              <SectionBar key={key} label={key.charAt(0).toUpperCase() + key.slice(1)} score={val} />
-            ))}
-          </div>
+          {Object.entries(atsResult.section_scores ?? {}).map(([k, v]) => <Bar key={k} label={k} score={v} />)}
         </div>
       </div>
 
       {/* Keywords */}
-      <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-400">Keywords</h2>
+      <div className="glass-card-static p-6 space-y-5 fade-in-up stagger-3" style={{ borderStyle: 'solid' }}>
+        <h2 className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Keywords</h2>
         <div>
-          <p className="text-xs font-medium text-zinc-500 mb-2">Matched</p>
+          <p className="text-xs mb-2.5" style={{ color: 'var(--text-muted)' }}>
+            Matched <span className="font-semibold" style={{ color: 'var(--success)' }}>({atsResult.matched_keywords?.length ?? 0})</span>
+          </p>
           <div className="flex flex-wrap gap-2">
-            {atsResult.matched_keywords.map((kw) => <Pill key={kw} label={kw} variant="green" />)}
+            {atsResult.matched_keywords?.map(k => <Keyword key={k} label={k} matched />)}
           </div>
         </div>
         <div>
-          <p className="text-xs font-medium text-zinc-500 mb-2">Missing</p>
+          <p className="text-xs mb-2.5" style={{ color: 'var(--text-muted)' }}>
+            Missing <span className="font-semibold" style={{ color: 'var(--danger)' }}>({atsResult.missing_keywords?.length ?? 0})</span>
+          </p>
           <div className="flex flex-wrap gap-2">
-            {atsResult.missing_keywords.map((kw) => <Pill key={kw} label={kw} variant="red" />)}
+            {atsResult.missing_keywords?.map(k => <Keyword key={k} label={k} matched={false} />)}
           </div>
         </div>
       </div>
 
       {/* Suggestions */}
       {atsResult.suggestions?.length > 0 && (
-        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+        <div className="glass-card-static overflow-hidden fade-in-up stagger-4" style={{ borderStyle: 'solid' }}>
           <button
-            onClick={() => setShowSuggestions(!showSuggestions)}
-            className="w-full flex items-center justify-between px-6 py-4 text-sm font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
+            onClick={() => setOpen(!open)}
+            className="w-full flex items-center justify-between px-6 py-4 text-sm font-semibold transition-colors"
+            style={{ color: 'var(--text-primary)' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card-hover)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
           >
-            Improvement Suggestions ({atsResult.suggestions.length})
-            {showSuggestions ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            Improvement Suggestions
+            <span className="flex items-center gap-2 text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+              {atsResult.suggestions.length} items {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </span>
           </button>
-          {showSuggestions && (
-            <div className="border-t border-zinc-200 dark:border-zinc-800 divide-y divide-zinc-100 dark:divide-zinc-800">
+          {open && (
+            <div style={{ borderTop: '1px solid var(--border-subtle)' }}>
               {atsResult.suggestions.map((s, i) => (
-                <div key={i} className="px-6 py-4 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-2 py-0.5 rounded">
-                      {s.section}
-                    </span>
-                  </div>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-300">{s.issue}</p>
-                  <p className="text-sm text-indigo-600 dark:text-indigo-400">{s.fix}</p>
+                <div
+                  key={i}
+                  className="px-6 py-4 space-y-2"
+                  style={{ borderBottom: i < atsResult.suggestions.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}
+                >
+                  <span
+                    className="text-xs font-medium px-2.5 py-0.5 rounded-md"
+                    style={{
+                      background: 'var(--bg-card-hover)',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
+                    {s.section}
+                  </span>
+                  <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{s.issue}</p>
+                  <p className="text-sm" style={{ color: 'var(--accent-mid)' }}>{s.fix}</p>
                 </div>
               ))}
             </div>
@@ -140,14 +229,55 @@ export default function Results() {
         </div>
       )}
 
-      {/* CTA */}
-      <button
-        onClick={() => navigate("/interview", { state: { resume, jobDescription } })}
-        className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500
-          text-white text-sm font-medium rounded-xl px-6 py-3 transition-colors duration-150"
-      >
-        Start Mock Interview <ArrowRight size={16} />
-      </button>
+      {/* Interview duration picker + CTA */}
+      <div className="glass-card-static p-5 space-y-4 fade-in-up stagger-5" style={{ borderStyle: 'solid' }}>
+        <div className="flex items-center gap-2">
+          <Clock size={14} style={{ color: 'var(--text-muted)' }} />
+          <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+            Interview Duration
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {DURATIONS.map((d) => {
+            const active = selectedDuration.minutes === d.minutes;
+            return (
+              <button
+                key={d.minutes}
+                onClick={() => setSelectedDuration(d)}
+                className="flex flex-col items-center gap-0.5 py-3 px-2 rounded-xl transition-all duration-200"
+                style={{
+                  background: active
+                    ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(6, 182, 212, 0.15))'
+                    : 'var(--bg-card-hover)',
+                  border: active
+                    ? '1px solid rgba(139, 92, 246, 0.4)'
+                    : '1px solid var(--border-subtle)',
+                  boxShadow: active ? '0 0 16px var(--accent-glow)' : 'none',
+                }}
+              >
+                <span className="text-sm font-bold" style={{ color: active ? 'var(--accent-mid)' : 'var(--text-primary)' }}>
+                  {d.label}
+                </span>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{d.questions} questions</span>
+                <span className="text-xs" style={{ color: active ? 'var(--accent-end)' : 'var(--text-muted)' }}>{d.desc}</span>
+              </button>
+            );
+          })}
+        </div>
+        <button
+          onClick={() => navigate("/interview", {
+            state: {
+              resume,
+              jobDescription,
+              questionCount: selectedDuration.questions,
+              duration: selectedDuration.minutes,
+            },
+          })}
+          className="w-full flex items-center justify-center gap-2.5 gradient-btn text-sm py-3.5 px-6"
+        >
+          Start Mock Interview <ArrowRight size={16} />
+        </button>
+      </div>
     </div>
   );
 }
