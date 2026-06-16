@@ -31,3 +31,6 @@ Thumbs.db
 # IDEs
 .vscode/
 .idea/
+
+# Docs
+docs/
