@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "./context/ThemeContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import Layout from "./components/Layout";
-import Home from "./pages/Home";
 import Results from "./pages/Results";
 import Interview from "./pages/Interview";
 import Report from "./pages/Report";
@@ -29,13 +28,13 @@ export default function App() {
         <BrowserRouter>
           <Layout>
             <Routes>
-              <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-              <Route path="/results" element={<ProtectedRoute><Results /></ProtectedRoute>} />
-              <Route path="/interview" element={<ProtectedRoute><Interview /></ProtectedRoute>} />
-              <Route path="/report" element={<ProtectedRoute><Report /></ProtectedRoute>} />
-              <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
-              <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/results"   element={<ProtectedRoute><Results /></ProtectedRoute>} />
+              <Route path="/interview" element={<ProtectedRoute><Interview /></ProtectedRoute>} />
+              <Route path="/report"    element={<ProtectedRoute><Report /></ProtectedRoute>} />
+              <Route path="/login"     element={<GuestRoute><Login /></GuestRoute>} />
+              <Route path="/register"  element={<GuestRoute><Register /></GuestRoute>} />
             </Routes>
           </Layout>
         </BrowserRouter>

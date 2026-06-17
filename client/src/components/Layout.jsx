@@ -51,7 +51,7 @@ export default function Layout({ children }) {
             {user ? (
               <>
                 {/* Dashboard link (when not already there) */}
-                {!isDashboard && (
+                {!isDashboard && location.pathname !== "/" && (
                   <Link
                     to="/dashboard"
                     className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200"

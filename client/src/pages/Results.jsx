@@ -3,9 +3,9 @@ import { CheckCircle2, XCircle, ChevronDown, ChevronUp, ArrowRight, RotateCcw, C
 import { useState, useEffect } from "react";
 
 const DURATIONS = [
-  { label: "15 min", minutes: 15, questions: 3, desc: "Quick screen" },
-  { label: "30 min", minutes: 30, questions: 5, desc: "Standard" },
-  { label: "1 hour", minutes: 60, questions: 8, desc: "Full loop round" },
+  { label: "15 min", minutes: 15, desc: "Quick screen" },
+  { label: "30 min", minutes: 30, desc: "Standard" },
+  { label: "1 hour", minutes: 60, desc: "Full loop round" },
 ];
 
 function ScoreRing({ score }) {
@@ -258,7 +258,6 @@ export default function Results() {
                 <span className="text-sm font-bold" style={{ color: active ? 'var(--accent-mid)' : 'var(--text-primary)' }}>
                   {d.label}
                 </span>
-                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{d.questions} questions</span>
                 <span className="text-xs" style={{ color: active ? 'var(--accent-end)' : 'var(--text-muted)' }}>{d.desc}</span>
               </button>
             );
@@ -269,7 +268,6 @@ export default function Results() {
             state: {
               resume,
               jobDescription,
-              questionCount: selectedDuration.questions,
               duration: selectedDuration.minutes,
             },
           })}
