@@ -1,12 +1,26 @@
 import { Router } from "express";
 import { chat, stripJson } from "../services/groq.js";
+import { optionalAuth } from "../middleware/auth.js";
+import Resume from "../models/Resume.js";
 
 const router = Router();
 
 const SYSTEM = `You are a strict ATS scoring engine used by top companies. Return structured JSON only. No markdown, no explanation.`;
 
-router.post("/", async (req, res) => {
-  const { resume, jobDescription } = req.body;
+router.post("/", optionalAuth, async (req, res) => {
+  let { resume, resumeId, jobDescription } = req.body;
+
+  // Load resume from DB if resumeId provided and user is authenticated
+  if (resumeId && req.user) {
+    try {
+      const doc = await Resume.findOne({ _id: resumeId, userId: req.user._id });
+      if (!doc) return res.status(404).json({ error: "Resume not found" });
+      resume = doc.parsedData;
+    } catch {
+      return res.status(500).json({ error: "Failed to load resume" });
+    }
+  }
+
   if (!resume || !jobDescription)
     return res.status(400).json({ error: "resume and jobDescription are required" });
 

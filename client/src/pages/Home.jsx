@@ -43,9 +43,12 @@ export default function Home() {
     setLoading(true);
     setError("");
     try {
-      const { data: resume } = await parseResume(file);
+      // parse returns { data: parsedJson, resumeId (if logged in) }
+      const { data: parseResult } = await parseResume(file);
+      const resume = parseResult.data;
+      const resumeId = parseResult.resumeId ?? null;
       const { data: atsResult } = await analyzeResume(resume, jd);
-      navigate("/results", { state: { resume, atsResult, jobDescription: jd } });
+      navigate("/results", { state: { resume, atsResult, jobDescription: jd, resumeId } });
     } catch (err) {
       setError(err.response?.data?.error || "Something went wrong. Please try again.");
     } finally {
@@ -61,22 +64,20 @@ export default function Home() {
         <div
           className="inline-flex items-center gap-2 text-xs font-medium px-4 py-1.5 rounded-full mb-6"
           style={{
-            background: 'var(--accent-glow)',
-            color: 'var(--accent-mid)',
-            border: '1px solid rgba(139, 92, 246, 0.2)',
+            background: "var(--accent-glow)",
+            color: "var(--accent-mid)",
+            border: "1px solid rgba(139, 92, 246, 0.2)",
           }}
         >
           <Sparkles size={12} />
           AI-powered resume intelligence
         </div>
-        <h1
-          className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1] mb-4"
-        >
+        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1] mb-4">
           Know your chances.
           <br />
           <span className="gradient-text">Ace the interview.</span>
         </h1>
-        <p className="text-base leading-relaxed max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>
+        <p className="text-base leading-relaxed max-w-md mx-auto" style={{ color: "var(--text-secondary)" }}>
           Upload your resume and paste a job description to get your ATS score, gap analysis, and a live mock interview.
         </p>
       </div>
@@ -89,15 +90,11 @@ export default function Home() {
         onDrop={handleDrop}
         className="cursor-pointer glass-card p-8 text-center transition-all duration-300 select-none fade-in-up stagger-2"
         style={{
-          borderStyle: file ? 'solid' : 'dashed',
-          borderWidth: '2px',
-          borderColor: dragging
-            ? 'var(--accent-start)'
-            : file
-              ? 'rgba(139, 92, 246, 0.3)'
-              : 'var(--border-subtle)',
-          boxShadow: dragging ? '0 0 40px var(--accent-glow), inset 0 0 40px rgba(139, 92, 246, 0.05)' : 'none',
-          transform: dragging ? 'scale(1.01)' : 'scale(1)',
+          borderStyle: file ? "solid" : "dashed",
+          borderWidth: "2px",
+          borderColor: dragging ? "var(--accent-start)" : file ? "rgba(139, 92, 246, 0.3)" : "var(--border-subtle)",
+          boxShadow: dragging ? "0 0 40px var(--accent-glow), inset 0 0 40px rgba(139, 92, 246, 0.05)" : "none",
+          transform: dragging ? "scale(1.01)" : "scale(1)",
         }}
       >
         <input ref={inputRef} type="file" accept=".pdf,.docx,.doc" className="hidden" onChange={(e) => handleFile(e.target.files[0])} />
@@ -106,23 +103,20 @@ export default function Home() {
           <div className="flex items-center justify-center gap-4">
             <div
               className="w-11 h-11 rounded-xl flex items-center justify-center"
-              style={{
-                background: 'var(--accent-glow)',
-                border: '1px solid rgba(139, 92, 246, 0.2)',
-              }}
+              style={{ background: "var(--accent-glow)", border: "1px solid rgba(139, 92, 246, 0.2)" }}
             >
-              <FileText size={18} style={{ color: 'var(--accent-mid)' }} />
+              <FileText size={18} style={{ color: "var(--accent-mid)" }} />
             </div>
             <div className="text-left">
-              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{file.name}</p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{(file.size / 1024).toFixed(0)} KB · Ready to analyze</p>
+              <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{file.name}</p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>{(file.size / 1024).toFixed(0)} KB · Ready to analyze</p>
             </div>
             <button
               onClick={(e) => { e.stopPropagation(); setFile(null); }}
               className="ml-auto p-2 rounded-lg transition-all duration-200"
-              style={{ color: 'var(--text-muted)' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card-hover)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              style={{ color: "var(--text-muted)" }}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--bg-card-hover)"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
             >
               <X size={14} />
             </button>
@@ -131,17 +125,14 @@ export default function Home() {
           <div className="flex flex-col items-center gap-3">
             <div
               className="w-14 h-14 rounded-2xl flex items-center justify-center float"
-              style={{
-                background: 'var(--bg-card-hover)',
-                border: '1px solid var(--border-subtle)',
-              }}
+              style={{ background: "var(--bg-card-hover)", border: "1px solid var(--border-subtle)" }}
             >
-              <Upload size={22} style={{ color: 'var(--text-muted)' }} />
+              <Upload size={22} style={{ color: "var(--text-muted)" }} />
             </div>
             <div>
-              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Drop your resume here</p>
-              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                or <span style={{ color: 'var(--accent-mid)' }} className="underline underline-offset-2 cursor-pointer">browse files</span> · PDF or DOCX · max 5MB
+              <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>Drop your resume here</p>
+              <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                or <span style={{ color: "var(--accent-mid)" }} className="underline underline-offset-2 cursor-pointer">browse files</span> · PDF or DOCX · max 5MB
               </p>
             </div>
           </div>
@@ -150,10 +141,7 @@ export default function Home() {
 
       {/* JD textarea */}
       <div className="mt-6 fade-in-up stagger-3">
-        <label
-          className="block text-xs font-medium uppercase tracking-widest mb-2"
-          style={{ color: 'var(--text-muted)' }}
-        >
+        <label className="block text-xs font-medium uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>
           Job Description
         </label>
         <textarea
@@ -169,11 +157,7 @@ export default function Home() {
       {error && (
         <div
           className="mt-4 flex items-center gap-2 text-sm rounded-xl px-4 py-3 scale-in"
-          style={{
-            background: 'var(--danger-glow)',
-            color: 'var(--danger)',
-            border: '1px solid rgba(239, 68, 68, 0.2)',
-          }}
+          style={{ background: "var(--danger-glow)", color: "var(--danger)", border: "1px solid rgba(239, 68, 68, 0.2)" }}
         >
           {error}
         </div>
@@ -197,19 +181,16 @@ export default function Home() {
           <div
             key={f.label}
             className={`glass-card p-4 text-center fade-in-up stagger-${i + 4}`}
-            style={{ borderStyle: 'solid' }}
+            style={{ borderStyle: "solid" }}
           >
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-3"
-              style={{
-                background: 'var(--accent-glow)',
-                border: '1px solid rgba(139, 92, 246, 0.15)',
-              }}
+              style={{ background: "var(--accent-glow)", border: "1px solid rgba(139, 92, 246, 0.15)" }}
             >
-              <f.icon size={18} style={{ color: 'var(--accent-mid)' }} />
+              <f.icon size={18} style={{ color: "var(--accent-mid)" }} />
             </div>
-            <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{f.label}</p>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{f.desc}</p>
+            <p className="text-sm font-semibold mb-1" style={{ color: "var(--text-primary)" }}>{f.label}</p>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>{f.desc}</p>
           </div>
         ))}
       </div>

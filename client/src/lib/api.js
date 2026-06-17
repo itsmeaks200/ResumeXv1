@@ -1,27 +1,26 @@
 import axios from "axios";
 
-const api = axios.create({ baseURL: "/api" });
+export const api = axios.create({ baseURL: "/api" });
 
+// Resume parsing
 export const parseResume = (file) => {
   const form = new FormData();
   form.append("resume", file);
   return api.post("/parse", form);
 };
 
-export const analyzeResume = (resume, jobDescription) =>
-  api.post("/analyze", { resume, jobDescription });
+// ATS analysis — pass resumeId (DB) or raw resume object
+export const analyzeResume = (resume, jobDescription, resumeId) =>
+  api.post("/analyze", { resume, jobDescription, resumeId });
 
-export const startInterview = (resume, jobDescription, questionCount = 5) =>
-  api.post("/interview/start", { resume, jobDescription, questionCount });
+// Auth
+export const loginApi = (email, password) =>
+  api.post("/auth/login", { email, password });
 
-export const transcribeAudio = (audioBlob) => {
-  const form = new FormData();
-  form.append("audio", audioBlob, "answer.webm");
-  return api.post("/interview/transcribe", form);
-};
+export const registerApi = (name, email, password) =>
+  api.post("/auth/register", { name, email, password });
 
-export const evaluateAnswer = (question, answer, resume) =>
-  api.post("/interview/answer", { question, answer, resume });
-
-export const endInterview = (questions, answers, evaluations) =>
-  api.post("/interview/end", { questions, answers, evaluations });
+// Resume library (requires auth header to be set)
+export const listResumes = () => api.get("/resumes");
+export const getResume = (id) => api.get(`/resumes/${id}`);
+export const deleteResume = (id) => api.delete(`/resumes/${id}`);
