@@ -3,6 +3,10 @@ import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: resolve(__dirname, "../.env") });
+
+// Export GitHub token for services to use
+export const GITHUB_TOKEN = process.env.GITHUB_TOKEN || process.env.GITHUB_ACCESS_TOKEN || null;
+
 import express from "express";
 import cors from "cors";
 import { createServer } from "http";

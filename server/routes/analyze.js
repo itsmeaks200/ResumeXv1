@@ -14,13 +14,13 @@ router.post("/", async (req, res) => {
 You are a strict ATS scanner. Score this resume against the job description with calibrated honesty — most resumes should score 40-75. Only exceptional matches score above 80.
 
 Scoring rules:
-- Extract every technical skill, tool, language, framework, and requirement from the JD
-- A keyword only counts as "matched" if it explicitly appears in the resume (no assumed synonyms)
-- Missing critical/required JD keywords heavily penalize the score (−5 to −10 each)
-- Years of experience mismatches penalize score
-- Projects and skills that are irrelevant to the JD do not add points
-- Section scores reflect real gaps: a skills section missing 60% of JD tools should score 30-45, not 70
-- Grade: A=85+, B=70-84, C=55-69, D=40-54, F=below 40
+- Extract technical skills, tools, languages, frameworks, and requirements from the JD
+- A keyword counts as "matched" if it explicitly or clearly appears in the resume
+- Missing critical/required keywords penalize the score (−3 to −6 each)
+- Strong project or experience relevance can compensate for minor keyword gaps
+- Section scores: a skills section missing ~40% of JD tools scores around 55-65
+- Calibration: a solid but imperfect match should score 60-75; a strong match 75-85; near-perfect 85+
+- Grade: A=80+, B=65-79, C=50-64, D=35-49, F=below 35
 
 Return JSON:
 {

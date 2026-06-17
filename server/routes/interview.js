@@ -14,6 +14,15 @@ router.post("/start", async (req, res) => {
     return res.status(400).json({ error: "resume and jobDescription are required" });
   }
 
+  // Extract GitHub URLs from resume projects
+  const githubUrls = (resume.projects || [])
+    .map(p => p.github_url)
+    .filter(Boolean);
+
+  const githubContext = githubUrls.length > 0
+    ? `\n\nGitHub Projects provided by candidate:\n${githubUrls.map(u => `- ${u}`).join("\n")}`
+    : "\n\nNo GitHub projects provided.";
+
   const prompt = `
 You are conducting a mock interview. Based on the resume and job description below, generate ${questionCount} interview questions.
 
@@ -42,6 +51,7 @@ ${jobDescription}
 
 Resume:
 ${JSON.stringify(resume, null, 2)}
+${githubContext}
 `;
 
   try {
@@ -77,6 +87,15 @@ router.post("/answer", async (req, res) => {
     return res.status(400).json({ error: "question and answer are required" });
   }
 
+  // Extract GitHub URLs from resume projects
+  const githubUrls = (resume.projects || [])
+    .map(p => p.github_url)
+    .filter(Boolean);
+
+  const githubContext = githubUrls.length > 0
+    ? `\n\nGitHub Projects (for additional context):\n${githubUrls.map(u => `- ${u}`).join("\n")}`
+    : "\n\nNo GitHub projects provided.";
+
   const prompt = `
 Evaluate the following interview answer. Return JSON:
 {
@@ -101,6 +120,7 @@ ${answer}
 
 Candidate's Resume (for context):
 ${JSON.stringify(resume || {}, null, 2)}
+${githubContext}
 `;
 
   try {
@@ -115,11 +135,20 @@ ${JSON.stringify(resume || {}, null, 2)}
 
 // POST /api/interview/end
 router.post("/end", async (req, res) => {
-  const { questions, answers, evaluations } = req.body;
+  const { questions, answers, evaluations, resume } = req.body;
 
   if (!questions || !evaluations) {
     return res.status(400).json({ error: "questions and evaluations are required" });
   }
+
+  // Extract GitHub URLs from resume projects
+  const githubUrls = (resume || {}).projects
+    ? (resume.projects || []).map(p => p.github_url).filter(Boolean)
+    : [];
+
+  const githubContext = githubUrls.length > 0
+    ? `\n\nGitHub Projects:\n${githubUrls.map(u => `- ${u}`).join("\n")}`
+    : "\n\nNo GitHub projects provided.";
 
   const prompt = `
 Generate a full interview debrief based on the session below. Return JSON:
@@ -148,6 +177,7 @@ Generate a full interview debrief based on the session below. Return JSON:
 Questions: ${JSON.stringify(questions)}
 Answers: ${JSON.stringify(answers)}
 Evaluations: ${JSON.stringify(evaluations)}
+${githubContext}
 `;
 
   try {
