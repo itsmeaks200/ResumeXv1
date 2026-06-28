@@ -2,10 +2,11 @@ const WS_URL = `ws://${window.location.hostname}:5000/ws/interview`;
 
 export function createInterviewSocket(handlers) {
   const ws = new WebSocket(WS_URL);
+  let intentional = false;
 
   ws.onopen = () => handlers.onOpen?.();
-  ws.onclose = () => handlers.onClose?.();
-  ws.onerror = (e) => handlers.onError?.(e);
+  ws.onclose = () => { if (!intentional) handlers.onClose?.(); };
+  ws.onerror = (e) => { if (!intentional) handlers.onError?.(e); };
 
   ws.onmessage = (event) => {
     try {
@@ -19,7 +20,7 @@ export function createInterviewSocket(handlers) {
   return {
     send: (type, payload = {}) => ws.send(JSON.stringify({ type, ...payload })),
     sendAudioChunk: (base64Chunk) => ws.send(JSON.stringify({ type: "audio_chunk", chunk: base64Chunk })),
-    close: () => ws.close(),
+    close: () => { intentional = true; ws.close(); },
     raw: ws,
   };
 }

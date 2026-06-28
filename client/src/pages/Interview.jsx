@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Mic, MicOff, Send, Loader2, ChevronRight, WifiOff, RotateCcw, Volume2, Clock } from "lucide-react";
+import { Mic, MicOff, Send, Loader2, WifiOff, RotateCcw, Volume2, Clock } from "lucide-react";
 import { createInterviewSocket, playAudio } from "../lib/interview-socket";
 
 const STAGES = {
@@ -11,7 +11,6 @@ const STAGES = {
   QUESTION: "question",              // ready for user input
   LISTENING: "listening",            // VAD active + recording
   PROCESSING: "processing",
-  FEEDBACK: "feedback",
   ERROR: "error",
 };
 
@@ -307,47 +306,6 @@ function MessageBubble({ msg }) {
     );
   }
 
-  if (msg.role === "feedback") {
-    const ev = msg.content;
-    const scoreColor = ev.overall >= 7 ? "var(--success)" : ev.overall >= 5 ? "var(--warning)" : "var(--danger)";
-    return (
-      <div className="fade-in ml-11">
-        <div className="rounded-2xl overflow-hidden" style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}>
-          <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>Feedback</span>
-              <div className="flex gap-2">
-                {Object.entries(ev.scores ?? {}).map(([k, v]) => (
-                  <span key={k} className="text-xs px-2 py-0.5 rounded-md" style={{ background: "var(--bg-card-hover)", color: "var(--text-secondary)" }}>
-                    {k}: <strong style={{ color: "var(--text-primary)" }}>{v}</strong>
-                  </span>
-                ))}
-              </div>
-            </div>
-            <span className="text-xl font-bold tabular-nums" style={{ color: scoreColor }}>
-              {ev.overall}<span className="text-xs font-normal ml-0.5" style={{ color: "var(--text-muted)" }}>/10</span>
-            </span>
-          </div>
-          <div className="px-4 py-3 space-y-3">
-            <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>{ev.feedback}</p>
-            {ev.model_answer_hints?.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>Strong answer includes</p>
-                <ul className="space-y-1.5">
-                  {ev.model_answer_hints.map((h, i) => (
-                    <li key={i} className="flex gap-2 text-xs" style={{ color: "var(--text-secondary)" }}>
-                      <span className="shrink-0 mt-0.5" style={{ color: "var(--accent-mid)" }}>→</span>{h}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return null;
 }
 
@@ -585,8 +543,9 @@ export default function Interview() {
         }
 
         if (msg.type === "evaluation") {
-          addMessage({ role: "feedback", content: msg.evaluation });
-          setStage(STAGES.FEEDBACK);
+          // Per-question feedback is intentionally not shown — full scoring
+          // and feedback only surfaces in the final report. Move straight on.
+          socketRef.current?.send("next");
         }
 
         if (msg.type === "transcript_confirmed") {
@@ -628,11 +587,6 @@ export default function Interview() {
     setStage(STAGES.QUESTION);
   };
 
-  const handleNext = () => {
-    setStage(STAGES.PROCESSING);
-    socketRef.current?.send("next");
-  };
-
   // ── Connecting screen ──────────────────────────────────────────────────
   if (stage === STAGES.CONNECTING) {
     return (
@@ -659,7 +613,6 @@ export default function Interview() {
   const isListening = stage === STAGES.LISTENING;
   const isCandidateIntro = stage === STAGES.CANDIDATE_INTRO;
   const isProcessing = stage === STAGES.PROCESSING;
-  const isFeedback = stage === STAGES.FEEDBACK;
   const canSpeak = stage === STAGES.QUESTION;
   const duration = state?.duration ?? 30;
   const pct = Math.min(100, (elapsedMin / duration) * 100);
@@ -810,9 +763,6 @@ export default function Interview() {
                   <Loader2 size={12} className="animate-spin" /> Evaluating your answer...
                 </span>
               )}
-              {isFeedback && (
-                <span className="text-xs" style={{ color: "var(--text-muted)" }}>Review feedback, then continue when ready</span>
-              )}
               {error && <span className="text-xs" style={{ color: "var(--danger)" }}>{error}</span>}
             </div>
 
@@ -852,14 +802,6 @@ export default function Interview() {
             {canSpeak && transcript && (
               <button onClick={submitAnswer} className="flex items-center gap-2 gradient-btn text-sm px-5 py-2.5">
                 <Send size={14} /> Submit
-              </button>
-            )}
-
-            {/* Next after feedback */}
-            {isFeedback && (
-              <button onClick={handleNext} className="flex items-center gap-2 gradient-btn text-sm px-5 py-2.5">
-                Continue
-                <ChevronRight size={14} />
               </button>
             )}
           </div>
