@@ -1,5 +1,7 @@
 import os
+import re
 import json
+import urllib.request
 import pdfplumber
 import docx
 from groq import Groq
@@ -9,21 +11,117 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
 
-def _find_nearby_text(words: list, link: dict, radius: int = 20) -> str:
-    """Return text from words that overlap or are close to the link bounding box."""
-    lx0, ly0, lx1, ly1 = link["x0"], link["top"], link["x1"], link["bottom"]
-    nearby = []
-    for w in words:
-        if (w["x0"] <= lx1 + radius and w["x1"] >= lx0 - radius and
-                w["top"] <= ly1 + radius and w["bottom"] >= ly0 - radius):
-            nearby.append(w["text"])
-    return " ".join(nearby).strip()
+# ---------------------------------------------------------------------------
+# GitHub helpers
+# ---------------------------------------------------------------------------
 
+def _extract_github_repos(text: str) -> list:
+    """Return deduplicated (owner, repo) tuples found anywhere in the text."""
+    pattern = r"github\.com/([a-zA-Z0-9._-]+)/([a-zA-Z0-9._-]+)"
+    seen = set()
+    result = []
+    for owner, repo in re.findall(pattern, text):
+        repo = repo.rstrip(".,;)/")   # strip trailing punctuation the regex may grab
+        key = (owner.lower(), repo.lower())
+        if key not in seen:
+            seen.add(key)
+            result.append((owner, repo))
+    return result
+
+
+def _fetch_github_metadata(owner: str, repo: str) -> dict:
+    """
+    Hit the public GitHub API (no token required for public repos) and the
+    raw README endpoint to build a short context block for the LLM.
+    Times out quickly so a bad URL never stalls the parser.
+    """
+    meta = {
+        "url": f"https://github.com/{owner}/{repo}",
+        "description": None,
+        "readme_gist": None,
+    }
+
+    # 1. Repo metadata (description, topics, etc.)
+    try:
+        req = urllib.request.Request(
+            f"https://api.github.com/repos/{owner}/{repo}",
+            headers={
+                "User-Agent": "ResumeX-Parser/1.0",
+                "Accept": "application/vnd.github+json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            data = json.loads(resp.read().decode())
+            meta["description"] = data.get("description") or None
+    except Exception:
+        pass  # network or 404 — silently continue
+
+    # 2. README gist (first ~400 readable characters)
+    for branch in ("main", "master"):
+        try:
+            raw_url = (
+                f"https://raw.githubusercontent.com/{owner}/{repo}"
+                f"/{branch}/README.md"
+            )
+            req = urllib.request.Request(
+                raw_url, headers={"User-Agent": "ResumeX-Parser/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=6) as resp:
+                content = resp.read().decode("utf-8", errors="ignore")
+                # Strip markdown badges, HTML tags, and blank lines
+                lines = [
+                    l.strip()
+                    for l in content.splitlines()
+                    if l.strip()
+                    and not l.startswith("![")
+                    and not l.startswith("<")
+                    and not l.startswith("[![")
+                ]
+                gist = " ".join(lines)[:400].strip()
+                if gist:
+                    meta["readme_gist"] = gist
+                break
+        except Exception:
+            continue
+
+    return meta
+
+
+def _build_github_context(text: str) -> str:
+    """
+    Discover all GitHub repo URLs in *text*, fetch live metadata for each,
+    and return a formatted section ready to be appended to the LLM prompt.
+    Returns an empty string if no repos are found.
+    """
+    repos = _extract_github_repos(text)
+    if not repos:
+        return ""
+
+    lines = ["GitHub Repository Details (fetched live):"]
+    for owner, repo in repos:
+        meta = _fetch_github_metadata(owner, repo)
+        lines.append(f"\n  URL: {meta['url']}")
+        if meta["description"]:
+            lines.append(f"  Description: {meta['description']}")
+        if meta["readme_gist"]:
+            lines.append(f'  README Gist: "{meta["readme_gist"]}"')
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Text extraction
+# ---------------------------------------------------------------------------
 
 def extract_text_from_pdf(file_path: str) -> str:
+    """
+    Extract body text and collect all hyperlink URIs from every page.
+    GitHub URIs are appended as plain text so the regex in _extract_github_repos
+    can find them alongside any typed-out URLs in the resume body.
+    """
     text = ""
-    annotated_links = []
-    seen_uris = set()
+    seen_uris: set = set()
+    github_uris: list = []
 
     with pdfplumber.open(file_path) as pdf:
         for page in pdf.pages:
@@ -31,20 +129,15 @@ def extract_text_from_pdf(file_path: str) -> str:
             if page_text:
                 text += page_text + "\n"
 
-            words = page.extract_words()
             for link in page.hyperlinks:
                 uri = link.get("uri", "")
-                if not uri or uri in seen_uris:
-                    continue
-                seen_uris.add(uri)
-                nearby_text = _find_nearby_text(words, link)
-                if nearby_text:
-                    annotated_links.append(f'"{nearby_text}" -> {uri}')
-                else:
-                    annotated_links.append(uri)
+                if uri and uri not in seen_uris:
+                    seen_uris.add(uri)
+                    if "github.com" in uri.lower():
+                        github_uris.append(uri)
 
-    if annotated_links:
-        text += "\n\nHyperlinks with context:\n" + "\n".join(annotated_links)
+    if github_uris:
+        text += "\n\nGitHub URLs from PDF hyperlinks:\n" + "\n".join(github_uris)
 
     return text.strip()
 
@@ -64,7 +157,11 @@ def extract_text(file_path: str) -> str:
         raise ValueError(f"Unsupported file type: {ext}")
 
 
-PARSE_PROMPT = """
+# ---------------------------------------------------------------------------
+# LLM prompt
+# ---------------------------------------------------------------------------
+
+PARSE_PROMPT = """\
 You are a resume parser. Extract structured information from the resume text below.
 
 Return a JSON object with this exact schema:
@@ -125,16 +222,31 @@ Rules:
 - If a field is not found in the resume, use null or empty array as appropriate.
 - Normalize skill aliases (JS -> JavaScript, ML -> Machine Learning, etc.)
 - Infer tech_stack from project descriptions if not explicitly listed.
-- Use the "Hyperlinks with context" section to match GitHub URLs to projects (github.com links) and set github_url accordingly.
-- If a hyperlink context text matches or is near a project name, assign that URL to that project's github_url.
+- A "GitHub Repository Details" section may appear at the end of the text.
+  Use it to:
+    1. Match each GitHub URL to the correct project by comparing the repo name
+       and description/README gist against the project names on the resume.
+    2. Set github_url for the matched project.
+    3. Enrich the project description and tech_stack using README content if
+       the resume entry is sparse.
 - live_url is for deployed/demo links (not GitHub).
 
 Resume text:
 """
 
 
+# ---------------------------------------------------------------------------
+# Main entry point
+# ---------------------------------------------------------------------------
+
 def parse_resume(file_path: str) -> dict:
     raw_text = extract_text(file_path)
+
+    # Fetch live GitHub metadata and append as extra context for the LLM
+    github_context = _build_github_context(raw_text)
+    prompt_text = raw_text
+    if github_context:
+        prompt_text += "\n\n" + github_context
 
     client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
@@ -146,14 +258,14 @@ def parse_resume(file_path: str) -> dict:
         messages=[
             {
                 "role": "user",
-                "content": PARSE_PROMPT + raw_text
+                "content": PARSE_PROMPT + prompt_text,
             }
-        ]
+        ],
     )
 
     response_text = message.choices[0].message.content.strip()
 
-    # strip markdown code fences if model wraps response in ```json ... ```
+    # Strip markdown code fences if model wraps response in ```json ... ```
     if response_text.startswith("```"):
         response_text = response_text.split("```")[1]
         if response_text.startswith("json"):
