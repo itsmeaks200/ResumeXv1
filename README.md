@@ -83,6 +83,7 @@ PORT=5000
 MONGODB_URI=mongodb://localhost:27017/resumex
 JWT_SECRET=change_this_to_a_long_random_secret
 GITHUB_TOKEN=                  # Optional — enables private repos & higher rate limit
+CLIENT_URL=http://localhost:5173  # Optional — CORS whitelist (default: Vite dev server)
 ```
 
 ### 2. Install dependencies
@@ -125,6 +126,7 @@ Visit [http://localhost:5173](http://localhost:5173).
 | `MONGODB_URI` | ✅ | MongoDB connection string |
 | `JWT_SECRET` | ✅ | Secret for signing JWTs — keep this long and random |
 | `GITHUB_TOKEN` | ❌ | Personal access token for GitHub API (5000 req/hr vs 60) |
+| `CLIENT_URL` | ❌ | Frontend origin for CORS whitelist (default: `http://localhost:5173`) |
 
 ---
 
@@ -137,7 +139,7 @@ Visit [http://localhost:5173](http://localhost:5173).
 | `POST` | `/api/parse` | Upload and parse a PDF resume |
 | `POST` | `/api/analyze` | Run AI analysis on parsed resume |
 | `GET` | `/api/resumes` | List saved resumes (auth required) |
-| `WS` | `/ws/interview` | Real-time interview session |
+| `WS` | `/ws/interview?token=<jwt>` | Real-time interview session (JWT required) |
 | `GET` | `/health` | Server health check |
 
 ---

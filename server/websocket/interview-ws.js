@@ -9,6 +9,7 @@ import {
 import { analyzeGithubRepos } from "../services/github.js";
 import { synthesize } from "../services/tts.js";
 import { transcribeAudio } from "../services/groq.js";
+import jwt from "jsonwebtoken";
 
 const sessions = new Map();
 
@@ -37,7 +38,18 @@ function startPreGen(session, action) {
   })();
 }
 
-export function handleInterviewSocket(ws) {
+export function handleInterviewSocket(ws, req) {
+  // Verify JWT from query params — browser WS API doesn't support custom headers
+  try {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const token = url.searchParams.get("token");
+    if (!token) throw new Error("No token provided");
+    jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+    ws.close(4401, "Authentication required");
+    return;
+  }
+
   let sessionId = null;
 
   // Keepalive ping to prevent proxy/load-balancer timeouts

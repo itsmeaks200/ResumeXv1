@@ -138,9 +138,11 @@ def parse_resume(file_path: str) -> dict:
 
     client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
+    # 4096 tokens gives ~3x headroom over typical resume JSON output (~1500 tokens).
+    # Lower values risk truncating mid-JSON on detailed resumes.
     message = client.chat.completions.create(
         model="llama-3.1-8b-instant",
-        max_tokens=2048,
+        max_tokens=4096,
         messages=[
             {
                 "role": "user",

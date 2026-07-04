@@ -1,7 +1,10 @@
-const WS_URL = `ws://${window.location.hostname}:5000/ws/interview`;
+function getWsUrl() {
+  const token = localStorage.getItem("token") || "";
+  return `ws://${window.location.hostname}:5000/ws/interview?token=${encodeURIComponent(token)}`;
+}
 
 export function createInterviewSocket(handlers) {
-  const ws = new WebSocket(WS_URL);
+  const ws = new WebSocket(getWsUrl());
   let intentional = false;
 
   ws.onopen = () => handlers.onOpen?.();

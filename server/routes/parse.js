@@ -3,6 +3,7 @@ import { execFile } from "child_process";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import multer from "multer";
 import { resumeUpload } from "../middleware/upload.js";
 import { optionalAuth } from "../middleware/auth.js";
 import Resume from "../models/Resume.js";
@@ -21,7 +22,8 @@ router.post("/", optionalAuth, resumeUpload.single("resume"), (req, res) => {
 
     if (err) {
       console.error("Parser error:", stderr);
-      return res.status(500).json({ error: "Failed to parse resume", details: stderr });
+      // Never send stderr to client — it contains internal paths and dependency versions
+      return res.status(500).json({ error: "Failed to parse resume. The file may be corrupted or in an unsupported format." });
     }
 
     let parsedData;
@@ -47,6 +49,20 @@ router.post("/", optionalAuth, resumeUpload.single("resume"), (req, res) => {
 
     res.json({ data: parsedData, resumeId });
   });
+});
+
+// Handle Multer-specific errors (file too large, wrong format) with clean 400s
+router.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ error: "File too large. Maximum size is 5MB." });
+    }
+    return res.status(400).json({ error: `Upload error: ${err.message}` });
+  }
+  if (err.message?.includes("Only PDF and DOCX")) {
+    return res.status(400).json({ error: err.message });
+  }
+  next(err);
 });
 
 export default router;

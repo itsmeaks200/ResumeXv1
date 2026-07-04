@@ -14,8 +14,8 @@ router.post("/register", async (req, res) => {
   const { name, email, password } = req.body;
   if (!name || !email || !password)
     return res.status(400).json({ error: "All fields required" });
-  if (password.length < 6)
-    return res.status(400).json({ error: "Password must be at least 6 characters" });
+  if (password.length < 8)
+    return res.status(400).json({ error: "Password must be at least 8 characters" });
   try {
     if (await User.findOne({ email }))
       return res.status(400).json({ error: "Email already registered" });
@@ -26,6 +26,11 @@ router.post("/register", async (req, res) => {
       user: { id: user._id, name: user.name, email: user.email },
     });
   } catch (err) {
+    // Catch the TOCTOU race: two concurrent registers with the same email
+    // can both pass findOne but one will fail on the unique index (code 11000)
+    if (err.code === 11000) {
+      return res.status(400).json({ error: "Email already registered" });
+    }
     console.error("Register error:", err);
     res.status(500).json({ error: "Registration failed" });
   }

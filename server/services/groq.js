@@ -33,10 +33,21 @@ export async function transcribeAudio(audioBuffer, mimeType = "audio/webm") {
   return transcription.text;
 }
 
+/**
+ * Extracts raw JSON from an LLM response that may be wrapped in markdown
+ * code fences (```json ... ```). Handles uppercase tags, missing closing
+ * fences, and extra whitespace.
+ */
 export function stripJson(text) {
+  const fenceMatch = text.match(/^```(?:json|JSON)?\s*\n?([\s\S]*?)\n?\s*```\s*$/);
+  if (fenceMatch) return fenceMatch[1].trim();
+
   if (text.startsWith("```")) {
-    text = text.split("```")[1];
-    if (text.startsWith("json")) text = text.slice(4);
+    let inner = text.slice(3);
+    if (/^json\s/i.test(inner)) inner = inner.replace(/^json\s*/i, "");
+    inner = inner.replace(/```\s*$/, "");
+    return inner.trim();
   }
+
   return text.trim();
 }

@@ -4,8 +4,6 @@ import { fileURLToPath } from "url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: resolve(__dirname, "../.env") });
 
-export const GITHUB_TOKEN = process.env.GITHUB_TOKEN || process.env.GITHUB_ACCESS_TOKEN || null;
-
 import express from "express";
 import cors from "cors";
 import { createServer } from "http";
@@ -21,8 +19,20 @@ const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server, path: "/ws/interview" });
 
-app.use(cors());
-app.use(express.json());
+// Restrict CORS to known frontend origins only
+const ALLOWED_ORIGINS = [
+  process.env.CLIENT_URL || "http://localhost:5173",
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
+  credentials: true,
+}));
+app.use(express.json({ limit: "2mb" }));
 
 app.use("/api/parse", parseRoute);
 app.use("/api/analyze", analyzeRoute);

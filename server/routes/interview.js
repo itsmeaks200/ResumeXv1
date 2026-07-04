@@ -1,8 +1,8 @@
-const express = require("express");
-const { chat, transcribeAudio, stripJson } = require("../services/groq");
-const { audioUpload } = require("../middleware/upload");
+import { Router } from "express";
+import { chat, transcribeAudio, stripJson } from "../services/groq.js";
+import { audioUpload } from "../middleware/upload.js";
 
-const router = express.Router();
+const router = Router();
 
 const SYSTEM = `You are an expert technical interviewer. Return structured JSON only. No markdown, no explanation.`;
 
@@ -14,7 +14,6 @@ router.post("/start", async (req, res) => {
     return res.status(400).json({ error: "resume and jobDescription are required" });
   }
 
-  // Extract GitHub URLs from resume projects
   const githubUrls = (resume.projects || [])
     .map(p => p.github_url)
     .filter(Boolean);
@@ -87,7 +86,6 @@ router.post("/answer", async (req, res) => {
     return res.status(400).json({ error: "question and answer are required" });
   }
 
-  // Extract GitHub URLs from resume projects
   const githubUrls = (resume.projects || [])
     .map(p => p.github_url)
     .filter(Boolean);
@@ -141,7 +139,6 @@ router.post("/end", async (req, res) => {
     return res.status(400).json({ error: "questions and evaluations are required" });
   }
 
-  // Extract GitHub URLs from resume projects
   const githubUrls = (resume || {}).projects
     ? (resume.projects || []).map(p => p.github_url).filter(Boolean)
     : [];
@@ -190,4 +187,4 @@ ${githubContext}
   }
 });
 
-module.exports = router;
+export default router;
