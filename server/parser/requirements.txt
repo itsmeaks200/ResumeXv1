@@ -1,4 +1,0 @@
-pdfplumber
-python-docx
-groq
-python-dotenv

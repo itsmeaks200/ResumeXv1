@@ -1,7 +1,7 @@
 import Groq from "groq-sdk";
 
 let _groq = null;
-const groq = () => {
+export const getGroqClient = () => {
   if (!_groq) _groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
   return _groq;
 };
@@ -14,7 +14,7 @@ export async function chat(prompt, systemPrompt = null) {
   if (systemPrompt) messages.push({ role: "system", content: systemPrompt });
   messages.push({ role: "user", content: prompt });
 
-  const response = await groq().chat.completions.create({
+  const response = await getGroqClient().chat.completions.create({
     model: EVAL_MODEL,
     max_tokens: 2048,
     messages,
@@ -25,7 +25,7 @@ export async function chat(prompt, systemPrompt = null) {
 
 export async function transcribeAudio(audioBuffer, mimeType = "audio/webm") {
   const file = new File([audioBuffer], "audio.webm", { type: mimeType });
-  const transcription = await groq().audio.transcriptions.create({
+  const transcription = await getGroqClient().audio.transcriptions.create({
     file,
     model: WHISPER_MODEL,
     response_format: "json",

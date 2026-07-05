@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { execFile } from "child_process";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -7,31 +6,19 @@ import multer from "multer";
 import { resumeUpload } from "../middleware/upload.js";
 import { optionalAuth } from "../middleware/auth.js";
 import Resume from "../models/Resume.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import { parseResumeFile } from "../services/parser.js";
 const router = Router();
 
-router.post("/", optionalAuth, resumeUpload.single("resume"), (req, res) => {
+router.post("/", optionalAuth, resumeUpload.single("resume"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
   const filePath = req.file.path;
-  const scriptPath = path.join(__dirname, "../parser/resume_parser.py");
-
-  execFile("python", [scriptPath, filePath], { timeout: 60000, env: process.env }, async (err, stdout, stderr) => {
+  
+  try {
+    const parsedData = await parseResumeFile(filePath, req.file.mimetype);
+    
+    // Always clean up uploaded file
     fs.unlink(filePath, () => {});
-
-    if (err) {
-      console.error("Parser error:", stderr);
-      // Never send stderr to client — it contains internal paths and dependency versions
-      return res.status(500).json({ error: "Failed to parse resume. The file may be corrupted or in an unsupported format." });
-    }
-
-    let parsedData;
-    try {
-      parsedData = JSON.parse(stdout);
-    } catch {
-      return res.status(500).json({ error: "Parser returned invalid JSON" });
-    }
 
     let resumeId = null;
     if (req.user) {
@@ -48,7 +35,13 @@ router.post("/", optionalAuth, resumeUpload.single("resume"), (req, res) => {
     }
 
     res.json({ data: parsedData, resumeId });
-  });
+    
+  } catch (err) {
+    // Always clean up uploaded file on error
+    fs.unlink(filePath, () => {});
+    console.error("Parser error:", err);
+    res.status(500).json({ error: "Failed to parse resume. The file may be corrupted or in an unsupported format." });
+  }
 });
 
 // Handle Multer-specific errors (file too large, wrong format) with clean 400s
