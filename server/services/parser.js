@@ -175,11 +175,18 @@ async function buildGithubContext(text) {
 }
 
 export async function parseResumeFile(filePath, mimetype) {
+  const { metrics } = await import("./metrics.js");
+  const end = metrics.startTimer("global", "resume_parse_total");
+
   const rawText = await extractText(filePath);
+
+  const endGH = metrics.startTimer("global", "parse_github_context");
   const githubContext = await buildGithubContext(rawText);
+  endGH();
   
   const promptText = githubContext ? `${rawText}\n\n${githubContext}` : rawText;
 
+  const endLLM = metrics.startTimer("global", "parse_llm");
   const client = getGroqClient();
   const completion = await client.chat.completions.create({
     model: 'openai/gpt-oss-20b',
@@ -190,10 +197,14 @@ export async function parseResumeFile(filePath, mimetype) {
       }
     ],
     max_tokens: 4096,
+    response_format: { type: "json_object" },
   });
+  endLLM({ model: 'openai/gpt-oss-20b', tokens: completion.usage?.total_tokens ?? 0 });
 
   const responseText = completion.choices[0].message.content.trim();
   const jsonString = stripJson(responseText);
   
-  return JSON.parse(jsonString);
+  const parsed = JSON.parse(jsonString);
+  end();
+  return parsed;
 }

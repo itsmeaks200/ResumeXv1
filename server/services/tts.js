@@ -1,4 +1,5 @@
 import Groq from "groq-sdk";
+import { metrics } from "./metrics.js";
 
 const GEMINI_API_KEY = () => process.env.GEMINI_API_KEY;
 const VOICE_NAME = process.env.GEMINI_TTS_VOICE || "Kore";
@@ -70,16 +71,37 @@ async function synthesizeGemini(text) {
   return pcmToWav(Buffer.from(base64Pcm, "base64")).toString("base64");
 }
 
-export async function synthesize(text) {
+export async function synthesize(text, { sessionId = "global" } = {}) {
+  const end = metrics.startTimer(sessionId, "tts_total");
   try {
-    return await synthesizeGemini(text);
-  } catch (err) {
-    console.error("Gemini TTS failed, falling back to Groq:", err.message);
+    const endGemini = metrics.startTimer(sessionId, "tts_gemini");
     try {
-      return await synthesizeGroq(text);
+      const result = await synthesizeGemini(text);
+      endGemini({ provider: "gemini", textLength: text.length });
+      metrics.record(sessionId, "tts_provider", { success: true, provider: "gemini" });
+      end({ provider: "gemini" });
+      return result;
+    } catch (err) {
+      endGemini({ error: err.message });
+      console.error("Gemini TTS failed, falling back to Groq:", err.message);
+    }
+
+    const endGroq = metrics.startTimer(sessionId, "tts_groq");
+    try {
+      const result = await synthesizeGroq(text);
+      endGroq({ provider: "groq", textLength: text.length });
+      metrics.record(sessionId, "tts_provider", { success: true, provider: "groq", fallback: true });
+      end({ provider: "groq", fallback: true });
+      return result;
     } catch (groqErr) {
+      endGroq({ error: groqErr.message });
       console.error("Groq TTS fallback also failed:", groqErr.message);
+      metrics.record(sessionId, "tts_provider", { success: false });
+      end({ error: "all_failed" });
       return null;
     }
+  } catch (err) {
+    end({ error: err.message });
+    return null;
   }
 }

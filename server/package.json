@@ -5,7 +5,12 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "test:latency": "node test/latency-benchmark.js",
+    "test:ats": "node test/ats-calibration.js",
+    "test:json": "node test/json-reliability.js",
+    "test:models": "node test/model-comparison.js",
+    "test:all": "node test/latency-benchmark.js && node test/ats-calibration.js && node test/json-reliability.js && node test/model-comparison.js"
   },
   "keywords": [],
   "author": "",

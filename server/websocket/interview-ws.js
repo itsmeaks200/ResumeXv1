@@ -10,6 +10,7 @@ import { analyzeGithubRepos } from "../services/github.js";
 import { synthesize } from "../services/tts.js";
 import { transcribeAudio } from "../services/groq.js";
 import redis from "../services/redis.js";
+import { metrics } from "../services/metrics.js";
 import jwt from "jsonwebtoken";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -158,6 +159,7 @@ export function handleInterviewSocket(ws, req) {
       // ── start ────────────────────────────────────────────────────────
       if (type === "start") {
         sessionId = crypto.randomUUID();
+        const endTTFQ = metrics.startTimer(sessionId, "ttfq");  // Time-to-First-Question
         const session = createSession(
           data.resume,
           data.jobDescription,
@@ -166,19 +168,26 @@ export function handleInterviewSocket(ws, req) {
 
         // GitHub enrichment + intro generation run in parallel
         const githubPromise = (async () => {
+          const endGH = metrics.startTimer(sessionId, "github_enrichment_total");
           const urls = (data.resume?.projects ?? []).map((p) => p.github_url).filter(Boolean);
           if (urls.length > 0) {
             try {
               session.githubProjects = await analyzeGithubRepos(urls);
               console.log(`GitHub: enriched ${session.githubProjects.length}/${urls.length} projects`);
+              endGH({ found: session.githubProjects.length, total: urls.length });
             } catch (err) {
               console.warn("GitHub enrichment failed:", err.message);
+              endGH({ error: err.message });
             }
+          } else {
+            endGH({ skipped: true });
           }
         })();
 
+        const endIntro = metrics.startTimer(sessionId, "llm_intro");
         const [introSpeech] = await Promise.all([generateIntro(session), githubPromise]);
-        const introAudio = await synthesize(introSpeech);
+        endIntro();
+        const introAudio = await synthesize(introSpeech, { sessionId });
 
         // Persist session to Redis (or in-memory Map as fallback).
         // Also initialise the in-memory Map entry for the audio chunk accumulator
@@ -190,6 +199,8 @@ export function handleInterviewSocket(ws, req) {
           // No in-memory audioChunks entry needed — chunks go to Redis list
         }
 
+        const ttfqMs = endTTFQ();
+        console.log(`[METRIC] TTFQ=${ttfqMs}ms for session ${sessionId}`);
         send(ws, "session_ready", { sessionId });
         send(ws, "intro", { audio: introAudio });
         // Note: Q1 is NOT pre-generated here. It's generated AFTER the candidate
@@ -261,7 +272,9 @@ export function handleInterviewSocket(ws, req) {
         send(ws, "transcript_confirmed", { transcript });
         session.currentAnswer = transcript;
 
+        const endEval = metrics.startTimer(sessionId, "llm_evaluation");
         const { evaluation } = await evaluateAnswer(session);
+        endEval();
 
         const elapsedMs = session.sessionStartTime ? Date.now() - session.sessionStartTime : 0;
         const remainingMin = Math.max(0, session.duration - Math.floor(elapsedMs / 60000));
@@ -269,11 +282,15 @@ export function handleInterviewSocket(ws, req) {
         // Persist updated session (evaluations + nextAction written by evaluateAnswer)
         await sessionSet(sessionId, session);
 
+        // Track when evaluation was sent — used to calculate pre-gen timing
+        const evaluationSentAt = Date.now();
         send(ws, "evaluation", { evaluation, remainingMin });
 
         // Start pre-generating in the background while user reads evaluation
         if (session.nextAction !== "done") {
           startPreGen(session, session.nextAction, sessionId);
+          // Store evaluation send time for pre-gen hit rate calculation
+          localPromises.set(`${sessionId}:evalTs`, evaluationSentAt);
         }
         return;
       }
@@ -296,8 +313,20 @@ export function handleInterviewSocket(ws, req) {
         // the evaluation reading window, a short wait if still running, null if
         // pre-gen wasn't run on this instance (different server after reconnect).
         const prePromise = localPromises.get(sessionId) ?? null;
+        const evaluationSentAt = localPromises.get(`${sessionId}:evalTs`) ?? Date.now();
         localPromises.delete(sessionId);
+        localPromises.delete(`${sessionId}:evalTs`);
         const pre = prePromise ? await prePromise : null;
+        const userReadTimeMs = Date.now() - evaluationSentAt;
+
+        // ── Pre-gen hit rate tracking ──────────────────────────────────
+        const preGenHit = pre !== null && pre.action === session.nextAction;
+        metrics.record(sessionId, "pregen_hit", {
+          hit: preGenHit,
+          userReadTimeMs,
+          action: session.nextAction,
+        });
+        console.log(`[METRIC] preGenHit=${preGenHit}, userReadTime=${userReadTimeMs}ms, action=${session.nextAction}`);
 
         // Re-read session after pre-gen may have mutated + persisted it
         const freshSession = await sessionGet(sessionId);

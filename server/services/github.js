@@ -1,3 +1,5 @@
+import { metrics } from "./metrics.js";
+
 const GITHUB_API = "https://api.github.com";
 
 // Read token lazily so dotenv has time to load
@@ -27,8 +29,9 @@ function cleanReadme(raw) {
     .slice(0, 500);
 }
 
-export async function analyzeGithubRepo(githubUrl) {
+export async function analyzeGithubRepo(githubUrl, { sessionId = "global" } = {}) {
   if (!githubUrl) return null;
+  const end = metrics.startTimer(sessionId, "github_repo_fetch");
 
   // Parse owner/repo from URL
   const match = githubUrl.match(/github\.com\/([^/\s]+)\/([^/\s?#]+)/i);
@@ -60,7 +63,7 @@ export async function analyzeGithubRepo(githubUrl) {
 
     const techStack = Object.keys(langsData).slice(0, 6);
 
-    return {
+    const result = {
       name: repoData.name,
       description: repoData.description || "",
       primaryLanguage: repoData.language || "Unknown",
@@ -69,8 +72,12 @@ export async function analyzeGithubRepo(githubUrl) {
       url: repoData.html_url,
       readmeSnippet,
     };
+
+    end({ repo: `${owner}/${repo}`, hasReadme: !!readmeSnippet });
+    return result;
   } catch (err) {
     console.warn(`GitHub fetch failed for ${owner}/${repo}:`, err.message);
+    end({ error: err.message });
     return null;
   }
 }

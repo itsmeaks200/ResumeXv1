@@ -14,6 +14,7 @@ import parseRoute from "./routes/parse.js";
 import analyzeRoute from "./routes/analyze.js";
 import authRoute from "./routes/auth.js";
 import resumesRoute from "./routes/resumes.js";
+import { metrics } from "./services/metrics.js";
 
 const app = express();
 const server = createServer(app);
@@ -39,6 +40,11 @@ app.use("/api/analyze", analyzeRoute);
 app.use("/api/auth", authRoute);
 app.use("/api/resumes", resumesRoute);
 app.get("/health", (_, res) => res.json({ status: "ok" }));
+
+// GenAI pipeline metrics — latency percentiles, pre-gen hit rate, TTS fallback rate
+app.get("/metrics", (_, res) => {
+  res.json(metrics.getSummary());
+});
 
 wss.on("connection", handleInterviewSocket);
 
