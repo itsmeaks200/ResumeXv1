@@ -58,7 +58,7 @@ function UploadZone({ onUploaded }) {
   };
 
   return (
-    <div className="glass-card-static p-5 fade-in-up stagger-2" style={{ borderStyle: "dashed" }}>
+    <div className="surface-strong p-5 fade-in-up stagger-2" style={{ borderStyle: "dashed", borderWidth: "1px" }}>
       {!file ? (
         <div
           onClick={() => inputRef.current.click()}
@@ -85,7 +85,7 @@ function UploadZone({ onUploaded }) {
               PDF or DOCX · No job description needed yet
             </p>
           </div>
-          <span className="text-xs font-medium px-3 py-1.5 rounded-lg" style={{ color: "var(--accent-mid)", background: "var(--accent-glow)", border: "1px solid rgba(139,92,246,0.2)" }}>
+          <span className="text-xs font-medium px-3 py-1.5 rounded-full" style={{ color: "var(--accent-mid)", background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.16)" }}>
             Browse
           </span>
         </div>
@@ -93,7 +93,7 @@ function UploadZone({ onUploaded }) {
         <div className="flex items-center gap-4">
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-            style={{ background: "var(--accent-glow)", border: "1px solid rgba(139,92,246,0.2)" }}
+            style={{ background: "var(--accent-glow)", border: "1px solid rgba(15,118,110,0.16)" }}
           >
             <FileText size={18} style={{ color: "var(--accent-mid)" }} />
           </div>
@@ -184,7 +184,7 @@ function ActionPanel({ resumeId, mode, onClose, onAnalyzeDone, onInterviewStart 
       {mode === "ats" && (
         <>
           <div>
-            <label className="text-xs font-medium uppercase tracking-widest block mb-2" style={{ color: "var(--text-muted)" }}>
+            <label className="section-label block mb-2">
               Job Description
             </label>
             <textarea
@@ -198,7 +198,7 @@ function ActionPanel({ resumeId, mode, onClose, onAnalyzeDone, onInterviewStart 
           </div>
           {error && <p className="text-xs" style={{ color: "var(--danger)" }}>{error}</p>}
           <div className="flex gap-2 justify-end">
-            <button onClick={onClose} className="text-sm px-4 py-2 rounded-xl" style={{ color: "var(--text-muted)" }}>Cancel</button>
+            <button onClick={onClose} className="text-sm px-4 py-2 rounded-full" style={{ color: "var(--text-muted)", border: "1px solid var(--border-subtle)" }}>Cancel</button>
             <button onClick={handleATS} disabled={loading} className="flex items-center gap-2 gradient-btn text-sm px-5 py-2.5">
               {loading ? <Loader2 size={14} className="animate-spin" /> : <Target size={14} />}
               {loading ? "Analyzing..." : "Get ATS Score"}
@@ -210,7 +210,7 @@ function ActionPanel({ resumeId, mode, onClose, onAnalyzeDone, onInterviewStart 
       {mode === "interview" && (
         <>
           <div>
-            <label className="text-xs font-medium uppercase tracking-widest block mb-2" style={{ color: "var(--text-muted)" }}>
+            <label className="section-label block mb-2">
               Job Description <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(optional)</span>
             </label>
             <textarea
@@ -234,10 +234,10 @@ function ActionPanel({ resumeId, mode, onClose, onAnalyzeDone, onInterviewStart 
                   <button
                     key={d.minutes}
                     onClick={() => setSelectedDuration(d)}
-                    className="flex flex-col items-center gap-0.5 py-2.5 px-2 rounded-xl transition-all duration-200"
+                    className="flex flex-col items-center gap-0.5 py-2.5 px-2 rounded-full transition-all duration-200"
                     style={{
-                      background: active ? "linear-gradient(135deg, rgba(139,92,246,0.2), rgba(6,182,212,0.15))" : "var(--bg-card-hover)",
-                      border: active ? "1px solid rgba(139,92,246,0.4)" : "1px solid var(--border-subtle)",
+                      background: active ? "linear-gradient(135deg, rgba(99,102,241,0.18), rgba(20,184,166,0.12))" : "var(--bg-card-hover)",
+                      border: active ? "1px solid rgba(99,102,241,0.32)" : "1px solid var(--border-subtle)",
                     }}
                   >
                     <span className="text-sm font-bold" style={{ color: active ? "var(--accent-mid)" : "var(--text-primary)" }}>{d.label}</span>
@@ -311,10 +311,10 @@ export default function Dashboard() {
     <div className="max-w-2xl mx-auto space-y-8">
       {/* Header */}
       <div className="fade-in-up stagger-1">
-        <h1 className="text-3xl font-bold tracking-tight">
+        <h1 className="page-title text-3xl">
           {user?.name ? `Hi ${user.name.split(" ")[0]}` : "My Workspace"}
         </h1>
-        <p className="text-sm mt-1.5" style={{ color: "var(--text-secondary)" }}>
+        <p className="page-subtitle mt-1.5 text-sm">
           Upload resumes, add job descriptions when ready, then analyze or interview.
         </p>
       </div>
@@ -336,8 +336,8 @@ export default function Dashboard() {
           </div>
         ) : resumes.length === 0 ? (
           <div
-            className="glass-card-static p-10 text-center fade-in-up stagger-4"
-            style={{ borderStyle: "dashed" }}
+            className="surface-strong p-10 text-center fade-in-up stagger-4"
+            style={{ borderStyle: "dashed", borderWidth: "1px" }}
           >
             <FileText size={20} className="mx-auto mb-3" style={{ color: "var(--text-muted)" }} />
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>No resumes yet — upload one above</p>
@@ -348,11 +348,12 @@ export default function Dashboard() {
             return (
               <div
                 key={resume._id}
-                className={`glass-card-static overflow-hidden transition-all duration-300 fade-in-up stagger-${Math.min(idx + 4, 6)}`}
+                className={`surface-strong overflow-hidden transition-all duration-300 fade-in-up stagger-${Math.min(idx + 4, 6)}`}
                 style={{
                   borderStyle: "solid",
-                  borderColor: isExpanded ? "rgba(139,92,246,0.35)" : "var(--border-subtle)",
-                  boxShadow: isExpanded ? "0 0 24px var(--accent-glow)" : "none",
+                  borderWidth: "1px",
+                  borderColor: isExpanded ? "rgba(99,102,241,0.3)" : "var(--border-subtle)",
+                  boxShadow: isExpanded ? "0 0 0 1px rgba(99,102,241,0.12), 0 24px 60px rgba(2, 6, 23, 0.26)" : "none",
                 }}
               >
                 {/* Resume row */}
@@ -377,22 +378,22 @@ export default function Dashboard() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => openPanel(resume._id, "ats")}
-                      className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200"
+                      className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-all duration-200"
                       style={{
-                        background: isExpanded && expandedMode === "ats" ? "var(--accent-glow)" : "var(--bg-card-hover)",
+                        background: isExpanded && expandedMode === "ats" ? "rgba(99,102,241,0.12)" : "var(--bg-card-hover)",
                         color: isExpanded && expandedMode === "ats" ? "var(--accent-mid)" : "var(--text-secondary)",
-                        border: `1px solid ${isExpanded && expandedMode === "ats" ? "rgba(139,92,246,0.3)" : "var(--border-subtle)"}`,
+                        border: `1px solid ${isExpanded && expandedMode === "ats" ? "rgba(99,102,241,0.24)" : "var(--border-subtle)"}`,
                       }}
                     >
                       <Target size={12} /> ATS
                     </button>
                     <button
                       onClick={() => openPanel(resume._id, "interview")}
-                      className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200"
+                      className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-all duration-200"
                       style={{
-                        background: isExpanded && expandedMode === "interview" ? "var(--accent-glow)" : "var(--bg-card-hover)",
+                        background: isExpanded && expandedMode === "interview" ? "rgba(99,102,241,0.12)" : "var(--bg-card-hover)",
                         color: isExpanded && expandedMode === "interview" ? "var(--accent-mid)" : "var(--text-secondary)",
-                        border: `1px solid ${isExpanded && expandedMode === "interview" ? "rgba(139,92,246,0.3)" : "var(--border-subtle)"}`,
+                        border: `1px solid ${isExpanded && expandedMode === "interview" ? "rgba(99,102,241,0.24)" : "var(--border-subtle)"}`,
                       }}
                     >
                       <Mic size={12} /> Interview

@@ -141,13 +141,13 @@ export default function Results() {
       {/* Header */}
       <div className="flex items-start justify-between fade-in-up stagger-1">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">ATS Report</h1>
-          <p className="text-sm mt-2 max-w-md leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{atsResult.summary}</p>
+          <h1 className="page-title text-3xl">ATS Report</h1>
+          <p className="page-subtitle mt-2 max-w-md leading-relaxed">{atsResult.summary}</p>
         </div>
         <button
           onClick={() => navigate("/")}
-          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200 mt-1"
-          style={{ color: 'var(--text-muted)' }}
+          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-all duration-200 mt-1"
+          style={{ color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}
           onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-card-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
         >
@@ -156,7 +156,7 @@ export default function Results() {
       </div>
 
       {/* Score + sections */}
-      <div className="glass-card-static p-7 flex items-center gap-10 fade-in-up stagger-2" style={{ borderStyle: 'solid' }}>
+      <div className="surface-strong p-7 flex items-center gap-10 fade-in-up stagger-2">
         <ScoreRing score={atsResult.score} />
         <div className="flex-1 space-y-3">
           <div className="flex items-baseline gap-3 mb-4">
@@ -168,7 +168,7 @@ export default function Results() {
       </div>
 
       {/* Keywords */}
-      <div className="glass-card-static p-6 space-y-5 fade-in-up stagger-3" style={{ borderStyle: 'solid' }}>
+      <div className="surface-strong p-6 space-y-5 fade-in-up stagger-3">
         <h2 className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Keywords</h2>
         <div>
           <p className="text-xs mb-2.5" style={{ color: 'var(--text-muted)' }}>
@@ -190,7 +190,7 @@ export default function Results() {
 
       {/* Suggestions */}
       {atsResult.suggestions?.length > 0 && (
-        <div className="glass-card-static overflow-hidden fade-in-up stagger-4" style={{ borderStyle: 'solid' }}>
+        <div className="surface-strong overflow-hidden fade-in-up stagger-4">
           <button
             onClick={() => setOpen(!open)}
             className="w-full flex items-center justify-between px-6 py-4 text-sm font-semibold transition-colors"
@@ -230,7 +230,7 @@ export default function Results() {
       )}
 
       {/* Interview duration picker + CTA */}
-      <div className="glass-card-static p-5 space-y-4 fade-in-up stagger-5" style={{ borderStyle: 'solid' }}>
+      <div className="surface-strong p-5 space-y-4 fade-in-up stagger-5">
         <div className="flex items-center gap-2">
           <Clock size={14} style={{ color: 'var(--text-muted)' }} />
           <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
@@ -247,12 +247,12 @@ export default function Results() {
                 className="flex flex-col items-center gap-0.5 py-3 px-2 rounded-xl transition-all duration-200"
                 style={{
                   background: active
-                    ? 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(6, 182, 212, 0.15))'
+                    ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(20, 184, 166, 0.12))'
                     : 'var(--bg-card-hover)',
                   border: active
-                    ? '1px solid rgba(139, 92, 246, 0.4)'
+                    ? '1px solid rgba(99, 102, 241, 0.32)'
                     : '1px solid var(--border-subtle)',
-                  boxShadow: active ? '0 0 16px var(--accent-glow)' : 'none',
+                  boxShadow: active ? '0 0 0 1px rgba(99,102,241,0.12), 0 10px 24px rgba(2, 6, 23, 0.18)' : 'none',
                 }}
               >
                 <span className="text-sm font-bold" style={{ color: active ? 'var(--accent-mid)' : 'var(--text-primary)' }}>

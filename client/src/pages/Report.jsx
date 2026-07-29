@@ -68,7 +68,7 @@ function TranscriptItem({ item, index }) {
           {/* Answer */}
           <div
             className="px-4 py-3 rounded-xl text-sm leading-relaxed"
-            style={{ background: "linear-gradient(135deg,rgba(139,92,246,0.08),rgba(6,182,212,0.05))", border: "1px solid rgba(139,92,246,0.15)", color: "var(--text-secondary)" }}
+            style={{ background: "linear-gradient(135deg,rgba(14,165,163,0.08),rgba(37,99,235,0.05))", border: "1px solid rgba(15,118,110,0.14)", color: "var(--text-secondary)" }}
           >
             {item.answer || <em style={{ color: "var(--text-muted)" }}>No answer recorded</em>}
           </div>

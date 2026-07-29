@@ -147,7 +147,7 @@ function InterviewerAvatar({ stage }) {
       <div className="relative w-28 h-28 flex items-center justify-center">
         {isSpeaking && (
           <>
-            <div className="absolute inset-0 rounded-full pulse-ring" style={{ border: "2px solid rgba(139,92,246,0.3)" }} />
+            <div className="absolute inset-0 rounded-full pulse-ring" style={{ border: "2px solid rgba(15,118,110,0.25)" }} />
             <div className="absolute inset-0 rounded-full pulse-ring" style={{ border: "2px solid rgba(6,182,212,0.2)", animationDelay: "0.6s" }} />
           </>
         )}
@@ -156,7 +156,7 @@ function InterviewerAvatar({ stage }) {
           style={{
             background: "linear-gradient(135deg, var(--accent-start), var(--accent-end))",
             boxShadow: isSpeaking
-              ? "0 0 40px rgba(139,92,246,0.5), 0 0 80px rgba(139,92,246,0.15)"
+              ? "0 0 40px rgba(15,118,110,0.24), 0 0 80px rgba(37,99,235,0.14)"
               : "0 0 20px var(--accent-glow)",
           }}
         >
@@ -288,8 +288,8 @@ function MessageBubble({ msg }) {
           <div
             className="px-4 py-3 rounded-2xl rounded-tr-sm text-sm leading-relaxed"
             style={{
-              background: "linear-gradient(135deg, rgba(139,92,246,0.18), rgba(6,182,212,0.12))",
-              border: "1px solid rgba(139,92,246,0.25)",
+              background: "linear-gradient(135deg, rgba(14,165,163,0.12), rgba(37,99,235,0.08))",
+              border: "1px solid rgba(15,118,110,0.2)",
               color: "var(--text-primary)",
             }}
           >
@@ -298,7 +298,7 @@ function MessageBubble({ msg }) {
         </div>
         <div
           className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-          style={{ background: "linear-gradient(135deg, #7c3aed, #4f46e5)" }}
+          style={{ background: "linear-gradient(135deg, var(--accent-start), var(--accent-end))" }}
         >
           You
         </div>
@@ -327,9 +327,7 @@ export default function Interview() {
 
   const socketRef = useRef(null);
   const accumulatedRef = useRef("");
-  const mediaRef = useRef(null);
   const streamRef = useRef(null);
-  const audioChunksRef = useRef([]);
   const messagesEndRef = useRef(null);
   const stageRef = useRef(stage);
   const timerRef = useRef(null);
@@ -373,7 +371,6 @@ export default function Interview() {
     accumulatedRef.current = "";
     setTranscript("");
     setInterimText("");
-    audioChunksRef.current = [];
 
     startSR();
 
@@ -381,13 +378,6 @@ export default function Interview() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       startVAD(stream);
-
-      const mr = new MediaRecorder(stream);
-      mr.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
-      mr.start(3000);
-      mediaRef.current = mr;
     } catch {
       /* mic denied — SpeechRecognition only */
     }
@@ -397,26 +387,8 @@ export default function Interview() {
     stopSR();
     stopVAD();
     setInterimText("");
-
-    return new Promise((resolve) => {
-      if (mediaRef.current?.state === "recording") {
-        mediaRef.current.onstop = async () => {
-          for (const chunk of audioChunksRef.current) {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const base64 = reader.result.split(",")[1];
-              socketRef.current?.sendAudioChunk(base64);
-            };
-            reader.readAsDataURL(chunk);
-          }
-          streamRef.current?.getTracks().forEach((t) => t.stop());
-          resolve();
-        };
-        mediaRef.current.stop();
-      } else {
-        resolve();
-      }
-    });
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    return Promise.resolve();
   }, [stopSR, stopVAD]);
 
   // ── Submit answer ─────────────────────────────────────────────────────
@@ -457,15 +429,23 @@ export default function Interview() {
   useEffect(() => {
     if (!state?.resume) { navigate("/dashboard"); return; }
 
+    // Check if we have a previous session to reconnect to
+    const savedSessionId = sessionStorage.getItem("interviewSessionId");
+
     const socket = createInterviewSocket({
       onOpen: () => {
         setWsConnected(true);
-        socket.send("start", {
-          resume: state.resume,
-          jobDescription: state.jobDescription ?? "",
-          questionCount: state.questionCount ?? 5,
-          duration: state.duration ?? 30,
-        });
+        if (savedSessionId) {
+          // Attempt to resume the previous session
+          socket.send("resume", { sessionId: savedSessionId });
+        } else {
+          socket.send("start", {
+            resume: state.resume,
+            jobDescription: state.jobDescription ?? "",
+            questionCount: state.questionCount ?? 5,
+            duration: state.duration ?? 30,
+          });
+        }
       },
       onClose: () => setWsConnected(false),
       onError: () => {
@@ -473,6 +453,55 @@ export default function Interview() {
         setStage(STAGES.ERROR);
       },
       onMessage: async (msg) => {
+        // ── Session created — store sessionId for reconnect ───────────
+        if (msg.type === "session_ready") {
+          sessionStorage.setItem("interviewSessionId", msg.sessionId);
+        }
+
+        // ── Session resumed successfully ──────────────────────────────
+        if (msg.type === "resume_ok") {
+          sessionStorage.setItem("interviewSessionId", msg.sessionId);
+          if (msg.elapsed !== undefined) setElapsedMin(msg.elapsed);
+          if (msg.currentQuestion) {
+            setCurrentQuestion(msg.currentFollowUp ?? msg.currentQuestion);
+            setQuestionNum(msg.questionsAnswered + 1);
+            addMessage({ role: "system", content: `Interview resumed — ${msg.questionsAnswered} questions completed` });
+            addMessage({
+              role: "interviewer",
+              content: (msg.currentFollowUp ?? msg.currentQuestion).question,
+              meta: { type: (msg.currentFollowUp ?? msg.currentQuestion).type },
+            });
+            setStage(STAGES.QUESTION);
+          } else {
+            // Session exists but no question was asked yet — restart intro phase
+            addMessage({ role: "system", content: "Interview resumed — waiting for your introduction" });
+            setIsIntroPhase(true);
+            setStage(STAGES.CANDIDATE_INTRO);
+            await startMic();
+          }
+          // Start elapsed timer
+          if (!interviewStartRef.current && msg.elapsed > 0) {
+            interviewStartRef.current = Date.now() - msg.elapsed * 60000;
+            timerRef.current = setInterval(() => {
+              const mins = Math.floor((Date.now() - interviewStartRef.current) / 60000);
+              setElapsedMin(mins);
+            }, 30000);
+          }
+          return;
+        }
+
+        // ── Resume failed — fall back to fresh start ──────────────────
+        if (msg.type === "resume_failed") {
+          sessionStorage.removeItem("interviewSessionId");
+          socket.send("start", {
+            resume: state.resume,
+            jobDescription: state.jobDescription ?? "",
+            questionCount: state.questionCount ?? 5,
+            duration: state.duration ?? 30,
+          });
+          return;
+        }
+
         // ── Interviewer intro ──────────────────────────────────────────
         if (msg.type === "intro") {
           setStage(STAGES.INTRO);
@@ -553,6 +582,7 @@ export default function Interview() {
         }
 
         if (msg.type === "report") {
+          sessionStorage.removeItem("interviewSessionId");
           navigate("/report", { state: { report: msg.report } });
         }
 
@@ -580,10 +610,7 @@ export default function Interview() {
     stopVAD();
     stopSR();
     setInterimText("");
-    if (mediaRef.current?.state === "recording") {
-      mediaRef.current.onstop = () => {};
-      mediaRef.current.stop();
-    }
+    streamRef.current?.getTracks().forEach((t) => t.stop());
     setStage(STAGES.QUESTION);
   };
 
@@ -652,7 +679,7 @@ export default function Interview() {
           {isCandidateIntro && (
             <div
               className="w-full px-4 py-3 rounded-xl text-xs leading-relaxed"
-              style={{ background: "var(--accent-glow)", border: "1px solid rgba(139,92,246,0.2)", color: "var(--accent-mid)" }}
+              style={{ background: "var(--accent-glow)", border: "1px solid rgba(15,118,110,0.16)", color: "var(--accent-mid)" }}
             >
               Introduce yourself — take your time. I'll listen until you're done.
             </div>
@@ -706,7 +733,7 @@ export default function Interview() {
               <div className="max-w-[82%]">
                 <div
                   className="px-4 py-3 rounded-2xl rounded-tr-sm text-sm leading-relaxed"
-                  style={{ background: "rgba(139,92,246,0.08)", border: "1px dashed rgba(139,92,246,0.3)", color: "var(--text-primary)" }}
+                  style={{ background: "rgba(14,165,163,0.06)", border: "1px dashed rgba(15,118,110,0.24)", color: "var(--text-primary)" }}
                 >
                   <span>{transcript}</span>
                   {interimText && <span style={{ color: "var(--text-muted)" }}> {interimText}</span>}
@@ -714,7 +741,7 @@ export default function Interview() {
               </div>
               <div
                 className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-                style={{ background: "linear-gradient(135deg, #7c3aed, #4f46e5)" }}
+                style={{ background: "linear-gradient(135deg, var(--accent-start), var(--accent-end))" }}
               >
                 You
               </div>

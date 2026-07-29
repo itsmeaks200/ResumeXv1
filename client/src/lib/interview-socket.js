@@ -1,6 +1,11 @@
 function getWsUrl() {
   const token = localStorage.getItem("token") || "";
-  return `ws://${window.location.hostname}:5000/ws/interview?token=${encodeURIComponent(token)}`;
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  // In production (behind a reverse proxy), use the page's host directly.
+  // In dev, the API server runs on port 5000 while Vite runs on 5173.
+  const isDev = window.location.port === "5173";
+  const host = isDev ? `${window.location.hostname}:5000` : window.location.host;
+  return `${protocol}//${host}/ws/interview?token=${encodeURIComponent(token)}`;
 }
 
 export function createInterviewSocket(handlers) {
@@ -22,7 +27,6 @@ export function createInterviewSocket(handlers) {
 
   return {
     send: (type, payload = {}) => ws.send(JSON.stringify({ type, ...payload })),
-    sendAudioChunk: (base64Chunk) => ws.send(JSON.stringify({ type: "audio_chunk", chunk: base64Chunk })),
     close: () => { intentional = true; ws.close(); },
     raw: ws,
   };

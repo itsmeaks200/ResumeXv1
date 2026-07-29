@@ -57,28 +57,28 @@ export default function Home() {
   };
 
   return (
-    <div className="max-w-xl mx-auto">
+    <div className="max-w-2xl mx-auto">
 
       {/* Hero */}
       <div className="text-center mb-12 fade-in-up stagger-1">
         <div
           className="inline-flex items-center gap-2 text-xs font-medium px-4 py-1.5 rounded-full mb-6"
           style={{
-            background: "var(--accent-glow)",
+            background: "rgba(99, 102, 241, 0.08)",
             color: "var(--accent-mid)",
-            border: "1px solid rgba(139, 92, 246, 0.2)",
+            border: "1px solid rgba(99, 102, 241, 0.16)",
           }}
         >
           <Sparkles size={12} />
-          AI-powered resume intelligence
+          Clean ATS analysis and interview prep
         </div>
-        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1] mb-4">
-          Know your chances.
+        <h1 className="page-title mb-4">
+          Make your resume feel
           <br />
-          <span className="gradient-text">Ace the interview.</span>
+          <span className="gradient-text">designed, not decorated.</span>
         </h1>
-        <p className="text-base leading-relaxed max-w-md mx-auto" style={{ color: "var(--text-secondary)" }}>
-          Upload your resume and paste a job description to get your ATS score, gap analysis, and a live mock interview.
+        <p className="page-subtitle max-w-2xl mx-auto">
+          Upload a resume, paste a job description, and get a focused scorecard, gap analysis, and a mock interview flow that feels calm and professional.
         </p>
       </div>
 
@@ -88,13 +88,13 @@ export default function Home() {
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
-        className="cursor-pointer glass-card p-8 text-center transition-all duration-300 select-none fade-in-up stagger-2"
+        className="cursor-pointer surface-strong p-8 text-center transition-all duration-300 select-none fade-in-up stagger-2"
         style={{
           borderStyle: file ? "solid" : "dashed",
-          borderWidth: "2px",
-          borderColor: dragging ? "var(--accent-start)" : file ? "rgba(139, 92, 246, 0.3)" : "var(--border-subtle)",
-          boxShadow: dragging ? "0 0 40px var(--accent-glow), inset 0 0 40px rgba(139, 92, 246, 0.05)" : "none",
-          transform: dragging ? "scale(1.01)" : "scale(1)",
+          borderWidth: "1px",
+          borderColor: dragging ? "var(--accent-start)" : file ? "rgba(99, 102, 241, 0.28)" : "var(--border-subtle)",
+          boxShadow: dragging ? "0 0 0 1px rgba(99, 102, 241, 0.2), 0 24px 60px rgba(2, 6, 23, 0.24)" : "none",
+          transform: dragging ? "translateY(-1px)" : "translateY(0)",
         }}
       >
         <input ref={inputRef} type="file" accept=".pdf,.docx,.doc" className="hidden" onChange={(e) => handleFile(e.target.files[0])} />
@@ -103,7 +103,7 @@ export default function Home() {
           <div className="flex items-center justify-center gap-4">
             <div
               className="w-11 h-11 rounded-xl flex items-center justify-center"
-              style={{ background: "var(--accent-glow)", border: "1px solid rgba(139, 92, 246, 0.2)" }}
+              style={{ background: "rgba(99, 102, 241, 0.08)", border: "1px solid rgba(99, 102, 241, 0.16)" }}
             >
               <FileText size={18} style={{ color: "var(--accent-mid)" }} />
             </div>
@@ -141,7 +141,7 @@ export default function Home() {
 
       {/* JD textarea */}
       <div className="mt-6 fade-in-up stagger-3">
-        <label className="block text-xs font-medium uppercase tracking-widest mb-2" style={{ color: "var(--text-muted)" }}>
+        <label className="section-label block mb-2">
           Job Description
         </label>
         <textarea
@@ -176,16 +176,15 @@ export default function Home() {
       </button>
 
       {/* Feature cards */}
-      <div className="grid grid-cols-3 gap-3 mt-10">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-10">
         {features.map((f, i) => (
           <div
             key={f.label}
-            className={`glass-card p-4 text-center fade-in-up stagger-${i + 4}`}
-            style={{ borderStyle: "solid" }}
+            className={`surface p-4 text-center fade-in-up stagger-${i + 4}`}
           >
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-3"
-              style={{ background: "var(--accent-glow)", border: "1px solid rgba(139, 92, 246, 0.15)" }}
+              style={{ background: "rgba(99, 102, 241, 0.08)", border: "1px solid rgba(99, 102, 241, 0.14)" }}
             >
               <f.icon size={18} style={{ color: "var(--accent-mid)" }} />
             </div>

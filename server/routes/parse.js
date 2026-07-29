@@ -4,12 +4,12 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import multer from "multer";
 import { resumeUpload } from "../middleware/upload.js";
-import { optionalAuth } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.js";
 import Resume from "../models/Resume.js";
 import { parseResumeFile } from "../services/parser.js";
 const router = Router();
 
-router.post("/", optionalAuth, resumeUpload.single("resume"), async (req, res) => {
+router.post("/", requireAuth, resumeUpload.single("resume"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
   const filePath = req.file.path;
@@ -21,17 +21,15 @@ router.post("/", optionalAuth, resumeUpload.single("resume"), async (req, res) =
     fs.unlink(filePath, () => {});
 
     let resumeId = null;
-    if (req.user) {
-      try {
-        const saved = await Resume.create({
-          userId: req.user._id,
-          filename: req.file.originalname,
-          parsedData,
-        });
-        resumeId = saved._id;
-      } catch (e) {
-        console.warn("Failed to save resume to DB:", e.message);
-      }
+    try {
+      const saved = await Resume.create({
+        userId: req.user._id,
+        filename: req.file.originalname,
+        parsedData,
+      });
+      resumeId = saved._id;
+    } catch (e) {
+      console.warn("Failed to save resume to DB:", e.message);
     }
 
     res.json({ data: parsedData, resumeId });

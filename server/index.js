@@ -14,7 +14,14 @@ import parseRoute from "./routes/parse.js";
 import analyzeRoute from "./routes/analyze.js";
 import authRoute from "./routes/auth.js";
 import resumesRoute from "./routes/resumes.js";
+import { requireAuth } from "./middleware/auth.js";
+import { rateLimit } from "./middleware/rateLimit.js";
 import { metrics } from "./services/metrics.js";
+
+// Rate limiters for expensive AI-powered endpoints (F13 fix)
+const parseLimiter = rateLimit({ windowMs: 60_000, max: 10, message: "Too many parse requests. Please wait a minute." });
+const analyzeLimiter = rateLimit({ windowMs: 60_000, max: 15, message: "Too many analysis requests. Please wait a minute." });
+const authLimiter = rateLimit({ windowMs: 60_000, max: 20, message: "Too many login attempts. Please wait a minute." });
 
 const app = express();
 const server = createServer(app);
@@ -35,14 +42,14 @@ app.use(cors({
 }));
 app.use(express.json({ limit: "2mb" }));
 
-app.use("/api/parse", parseRoute);
-app.use("/api/analyze", analyzeRoute);
-app.use("/api/auth", authRoute);
+app.use("/api/parse", parseLimiter, parseRoute);
+app.use("/api/analyze", analyzeLimiter, analyzeRoute);
+app.use("/api/auth", authLimiter, authRoute);
 app.use("/api/resumes", resumesRoute);
 app.get("/health", (_, res) => res.json({ status: "ok" }));
 
 // GenAI pipeline metrics — latency percentiles, pre-gen hit rate, TTS fallback rate
-app.get("/metrics", (_, res) => {
+app.get("/metrics", requireAuth, (_, res) => {
   res.json(metrics.getSummary());
 });
 

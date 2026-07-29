@@ -1,13 +1,14 @@
 import { Router } from "express";
-import { chat, stripJson } from "../services/groq.js";
-import { optionalAuth } from "../middleware/auth.js";
+import { chat } from "../services/groq.js";
+import { ensureArray, ensureNumber, ensureObject, ensureString, ensureStringArray, parseValidatedJson } from "../services/json.js";
+import { requireAuth } from "../middleware/auth.js";
 import Resume from "../models/Resume.js";
 
 const router = Router();
 
 const SYSTEM = `You are a strict ATS scoring engine used by top companies. Return structured JSON only. No markdown, no explanation.`;
 
-router.post("/", optionalAuth, async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   let { resume, resumeId, jobDescription } = req.body;
 
   // Load resume from DB if resumeId provided and user is authenticated
@@ -52,7 +53,28 @@ Resume: ${JSON.stringify(resume, null, 2)}
 `;
 
   try {
-    const result = JSON.parse(stripJson(await chat(prompt, SYSTEM)));
+    const result = parseValidatedJson(await chat(prompt, SYSTEM), "ATS analysis", (value) => {
+      ensureObject(value, "analysis");
+      ensureNumber(value.score, "analysis.score", { min: 0, max: 100 });
+      ensureString(value.grade, "analysis.grade");
+      if (!["A", "B", "C", "D", "F"].includes(value.grade)) {
+        throw new Error("analysis.grade must be one of A, B, C, D, F");
+      }
+      ensureString(value.summary, "analysis.summary");
+      ensureStringArray(value.matched_keywords, "analysis.matched_keywords");
+      ensureStringArray(value.missing_keywords, "analysis.missing_keywords");
+      ensureObject(value.section_scores, "analysis.section_scores");
+      for (const key of ["skills", "experience", "projects", "education"]) {
+        ensureNumber(value.section_scores[key], `analysis.section_scores.${key}`, { min: 0, max: 100 });
+      }
+      ensureArray(value.suggestions, "analysis.suggestions");
+      value.suggestions.forEach((suggestion, index) => {
+        ensureObject(suggestion, `analysis.suggestions[${index}]`);
+        ensureString(suggestion.section, `analysis.suggestions[${index}].section`);
+        ensureString(suggestion.issue, `analysis.suggestions[${index}].issue`);
+        ensureString(suggestion.fix, `analysis.suggestions[${index}].fix`);
+      });
+    });
     res.json(result);
   } catch (err) {
     console.error("Analyze error:", err);

@@ -31,19 +31,18 @@ export default function Register() {
   return (
     <div className="max-w-sm mx-auto">
       <div className="text-center mb-8 fade-in-up stagger-1">
-        <h1 className="text-3xl font-bold tracking-tight">Create account</h1>
-        <p className="text-sm mt-2" style={{ color: "var(--text-secondary)" }}>
+        <h1 className="page-title text-3xl">Create account</h1>
+        <p className="page-subtitle mt-2 text-sm">
           Save resumes and track your progress
         </p>
       </div>
 
       <form
         onSubmit={handleSubmit}
-        className="glass-card-static p-8 space-y-5 fade-in-up stagger-2"
-        style={{ borderStyle: "solid" }}
+        className="surface-strong p-8 space-y-5 fade-in-up stagger-2"
       >
         <div className="space-y-1.5">
-          <label className="text-xs font-medium uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>
+          <label className="section-label block">
             Full Name
           </label>
           <input
@@ -57,7 +56,7 @@ export default function Register() {
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs font-medium uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>
+          <label className="section-label block">
             Email
           </label>
           <input
@@ -71,7 +70,7 @@ export default function Register() {
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs font-medium uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>
+          <label className="section-label block">
             Password
           </label>
           <input

@@ -8,7 +8,6 @@ import {
 } from "../services/interview-graph.js";
 import { analyzeGithubRepos } from "../services/github.js";
 import { synthesize } from "../services/tts.js";
-import { transcribeAudio } from "../services/groq.js";
 import redis from "../services/redis.js";
 import { metrics } from "../services/metrics.js";
 import jwt from "jsonwebtoken";
@@ -18,7 +17,6 @@ import jwt from "jsonwebtoken";
 //
 // When REDIS_URL is set:
 //   - Session state JSON   →  Redis string key  `session:<id>`  (TTL = duration + 10 min)
-//   - Audio chunk buffers  →  Redis list key     `audio:<id>`    (same TTL)
 //
 // When REDIS_URL is NOT set (redis === null):
 //   - Everything falls back to the in-memory Map below (original behaviour)
@@ -50,7 +48,7 @@ async function sessionGet(sessionId) {
 
 async function sessionSet(sessionId, session) {
   if (!redis) {
-    // In-memory path: keep the full entry (session + audioChunks ref is elsewhere)
+    // In-memory path: keep the full entry
     const existing = memSessions.get(sessionId) ?? {};
     memSessions.set(sessionId, { ...existing, session });
     return;
@@ -61,37 +59,17 @@ async function sessionSet(sessionId, session) {
 
 async function sessionDelete(sessionId) {
   if (!redis) { memSessions.delete(sessionId); return; }
-  await redis.del(`session:${sessionId}`, `audio:${sessionId}`);
+  await redis.del(`session:${sessionId}`);
 }
 
-// Audio chunks are stored as a Redis list (RPUSH / LRANGE / DEL).
-// In-memory path keeps chunks on the Map entry directly.
-
-async function audioChunkPush(sessionId, base64Chunk) {
-  if (!redis) {
-    const entry = memSessions.get(sessionId);
-    if (entry) entry.audioChunks.push(Buffer.from(base64Chunk, "base64"));
-    return;
-  }
-  await redis.rpush(`audio:${sessionId}`, base64Chunk);
-  // Refresh TTL on audio key whenever a chunk arrives (session still alive)
-  const session = await sessionGet(sessionId);
-  if (session) await redis.expire(`audio:${sessionId}`, sessionTTL(session.duration ?? 30));
+function clearSessionState(sessionId) {
+  if (!sessionId) return;
+  localPromises.delete(sessionId);
+  localPromises.delete(`${sessionId}:evalTs`);
+  metrics.clearRequest(sessionId);
 }
 
-async function audioChunkFlush(sessionId) {
-  if (!redis) {
-    const entry = memSessions.get(sessionId);
-    if (!entry || !entry.audioChunks.length) return null;
-    const buf = Buffer.concat(entry.audioChunks);
-    entry.audioChunks = [];
-    return buf;
-  }
-  const chunks = await redis.lrange(`audio:${sessionId}`, 0, -1);
-  if (!chunks.length) return null;
-  await redis.del(`audio:${sessionId}`);
-  return Buffer.concat(chunks.map((c) => Buffer.from(c, "base64")));
-}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -100,21 +78,21 @@ function send(ws, type, payload = {}) {
 }
 
 // Pre-generate next question + TTS during feedback reading window.
-// Stores the Promise in localPromises (not Redis — Promises aren't serialisable).
-// If another server instance handles the "next" message, it won't find the Promise
-// and will fall through to the synchronous generation path, which is already coded.
-function startPreGen(session, action, sessionId) {
+// Reads its own fresh session copy to avoid lost-update races with the
+// message handler's session reference (F3 fix).
+function startPreGen(action, sessionId) {
   const promise = (async () => {
     try {
+      const session = await sessionGet(sessionId);
+      if (!session) return null;
+
       if (action === "followup") {
         await generateFollowUp(session);
-        // Persist updated session (currentFollowUp was set on session object)
         await sessionSet(sessionId, session);
         const audio = await synthesize(session.currentFollowUp.question);
         return { action, audio };
       } else {
         const q = await generateNextQuestion(session);
-        // Persist updated session (currentQuestion was set on session object)
         await sessionSet(sessionId, session);
         const audio = await synthesize(q.question);
         return { action, audio };
@@ -144,8 +122,15 @@ export function handleInterviewSocket(ws, req) {
 
   let sessionId = null;
 
-  // Keepalive ping to prevent proxy/load-balancer timeouts
+  // Liveness detection — ping/pong pattern (F12 fix).
+  // If the client doesn't respond with a pong before the next sweep,
+  // the connection is considered dead and is terminated.
+  ws.isAlive = true;
+  ws.on("pong", () => { ws.isAlive = true; });
+
   const pingInterval = setInterval(() => {
+    if (!ws.isAlive) { ws.terminate(); return; }
+    ws.isAlive = false;
     if (ws.readyState === 1) ws.ping();
   }, 25000);
 
@@ -190,13 +175,10 @@ export function handleInterviewSocket(ws, req) {
         const introAudio = await synthesize(introSpeech, { sessionId });
 
         // Persist session to Redis (or in-memory Map as fallback).
-        // Also initialise the in-memory Map entry for the audio chunk accumulator
-        // when running without Redis.
         if (!redis) {
-          memSessions.set(sessionId, { session, audioChunks: [] });
+          memSessions.set(sessionId, { session });
         } else {
           await sessionSet(sessionId, session);
-          // No in-memory audioChunks entry needed — chunks go to Redis list
         }
 
         const ttfqMs = endTTFQ();
@@ -208,28 +190,44 @@ export function handleInterviewSocket(ws, req) {
         return;
       }
 
+      // ── resume (reconnect to existing session) ──────────────────────
+      if (type === "resume") {
+        const requestedId = data.sessionId;
+        if (!requestedId) { send(ws, "error", { message: "No sessionId provided" }); return; }
+
+        const session = await sessionGet(requestedId);
+        if (!session) {
+          send(ws, "resume_failed", { reason: "Session expired or not found" });
+          return;
+        }
+
+        sessionId = requestedId;
+        console.log(`Session ${sessionId} resumed (${session.evaluations?.length ?? 0} answers completed)`);
+
+        // Build a state snapshot so the client can restore its UI
+        const elapsedMs = session.sessionStartTime ? Date.now() - session.sessionStartTime : 0;
+        const remainingMin = Math.max(0, session.duration - Math.floor(elapsedMs / 60000));
+
+        send(ws, "resume_ok", {
+          sessionId,
+          questionsAnswered: session.evaluations?.length ?? 0,
+          currentQuestion: session.currentQuestion,
+          currentFollowUp: session.currentFollowUp,
+          nextAction: session.nextAction,
+          elapsed: Math.floor(elapsedMs / 60000),
+          duration: session.duration,
+          remainingMin,
+        });
+        return;
+      }
+
       // ── all subsequent handlers need a session ────────────────────────
       const session = await sessionGet(sessionId);
       if (!session) { send(ws, "error", { message: "Session not found" }); return; }
 
-      // ── audio chunk ──────────────────────────────────────────────────
-      if (type === "audio_chunk") {
-        await audioChunkPush(sessionId, data.chunk);
-        return;
-      }
-
       // ── candidate intro (not scored) ─────────────────────────────────
       if (type === "candidate_intro") {
-        let transcript = data.transcript ?? "";
-
-        const audioBuf = await audioChunkFlush(sessionId);
-        if (audioBuf) {
-          try {
-            transcript = await transcribeAudio(audioBuf);
-          } catch (err) {
-            console.warn("Whisper failed for intro:", err.message);
-          }
-        }
+        const transcript = data.transcript ?? "";
 
         session.candidateIntro = transcript;
         console.log("Candidate intro received, generating Q1 with intro context...");
@@ -253,16 +251,7 @@ export function handleInterviewSocket(ws, req) {
 
       // ── answer done ──────────────────────────────────────────────────
       if (type === "answer_done") {
-        let transcript = data.transcript ?? "";
-
-        const audioBuf = await audioChunkFlush(sessionId);
-        if (audioBuf) {
-          try {
-            transcript = await transcribeAudio(audioBuf);
-          } catch (err) {
-            console.warn("Whisper failed, using Web Speech:", err.message);
-          }
-        }
+        const transcript = data.transcript ?? "";
 
         if (!transcript.trim()) {
           send(ws, "error", { message: "No transcript received. Please say more." });
@@ -288,7 +277,7 @@ export function handleInterviewSocket(ws, req) {
 
         // Start pre-generating in the background while user reads evaluation
         if (session.nextAction !== "done") {
-          startPreGen(session, session.nextAction, sessionId);
+          startPreGen(session.nextAction, sessionId);
           // Store evaluation send time for pre-gen hit rate calculation
           localPromises.set(`${sessionId}:evalTs`, evaluationSentAt);
         }
@@ -305,7 +294,7 @@ export function handleInterviewSocket(ws, req) {
           await generateReport(session);
           send(ws, "report", { report: session.report });
           await sessionDelete(sessionId);
-          localPromises.delete(sessionId);
+          clearSessionState(sessionId);
           return;
         }
 
@@ -396,7 +385,7 @@ export function handleInterviewSocket(ws, req) {
 
   ws.on("close", () => {
     clearInterval(pingInterval);
-    localPromises.delete(sessionId);
+    clearSessionState(sessionId);
     // Session keys are intentionally NOT deleted from Redis on disconnect.
     // A 5-minute grace period (covered by the TTL already set) allows the
     // client to reconnect and resume. The TTL handles cleanup automatically.

@@ -21,13 +21,3 @@ export async function requireAuth(req, res, next) {
     res.status(401).json({ error: "Invalid or expired token" });
   }
 }
-
-export async function optionalAuth(req, res, next) {
-  const token = extractToken(req);
-  if (!token) return next();
-  try {
-    const { id } = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = (await User.findById(id).select("-password")) ?? undefined;
-  } catch { /* no-op */ }
-  next();
-}

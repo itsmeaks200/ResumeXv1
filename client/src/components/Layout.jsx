@@ -18,23 +18,23 @@ export default function Layout({ children }) {
   const isDashboard = location.pathname === "/dashboard";
 
   return (
-    <div className="relative min-h-screen" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
+    <div className="relative min-h-screen overflow-x-hidden" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
       <div className="bg-mesh"><div className="orb-3" /></div>
       <div className="bg-noise" />
 
       <header
         className="sticky top-0 z-50"
         style={{
-          background: dark ? "rgba(10, 10, 15, 0.7)" : "rgba(250, 250, 254, 0.7)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
+          background: dark ? "rgba(11, 16, 32, 0.72)" : "rgba(248, 250, 252, 0.78)",
+          backdropFilter: "blur(22px)",
+          WebkitBackdropFilter: "blur(22px)",
           borderBottom: "1px solid var(--border-subtle)",
         }}
       >
-        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="page-shell h-16 flex items-center justify-between">
           <Link to={user ? "/dashboard" : "/"} className="flex items-center gap-2.5 group">
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg"
+              className="w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-105 group-hover:shadow-lg"
               style={{
                 background: "linear-gradient(135deg, var(--accent-start), var(--accent-end))",
                 boxShadow: "0 2px 12px var(--accent-glow)",
@@ -50,30 +50,27 @@ export default function Layout({ children }) {
           <div className="flex items-center gap-2">
             {user ? (
               <>
-                {/* Dashboard link (when not already there) */}
                 {!isDashboard && location.pathname !== "/" && (
                   <Link
                     to="/dashboard"
-                    className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200"
-                    style={{ color: "var(--text-secondary)" }}
+                    className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-all duration-200"
+                    style={{ color: "var(--text-secondary)", border: "1px solid var(--border-subtle)" }}
                     onMouseEnter={e => { e.currentTarget.style.background = "var(--bg-card-hover)"; e.currentTarget.style.color = "var(--text-primary)"; }}
                     onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text-secondary)"; }}
                   >
                     <LayoutDashboard size={13} /> Dashboard
                   </Link>
                 )}
-                {/* User name */}
                 <span
-                  className="text-xs px-3 py-1.5 rounded-lg font-medium"
-                  style={{ color: "var(--text-muted)", background: "var(--bg-card-hover)" }}
+                  className="text-xs px-3 py-1.5 rounded-full font-medium"
+                  style={{ color: "var(--text-muted)", background: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}
                 >
                   {user.name.split(" ")[0]}
                 </span>
-                {/* Logout */}
                 <button
                   onClick={handleLogout}
-                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200"
-                  style={{ color: "var(--text-secondary)" }}
+                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-all duration-200"
+                  style={{ color: "var(--text-secondary)", border: "1px solid var(--border-subtle)" }}
                   onMouseEnter={e => { e.currentTarget.style.background = "var(--danger-glow)"; e.currentTarget.style.color = "var(--danger)"; }}
                   onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text-secondary)"; }}
                 >
@@ -85,8 +82,8 @@ export default function Layout({ children }) {
                 {!isHome && (
                   <Link
                     to="/"
-                    className="text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200"
-                    style={{ color: "var(--text-secondary)" }}
+                    className="text-xs font-medium px-3 py-1.5 rounded-full transition-all duration-200"
+                    style={{ color: "var(--text-secondary)", border: "1px solid var(--border-subtle)" }}
                     onMouseEnter={e => { e.currentTarget.style.background = "var(--bg-card-hover)"; e.currentTarget.style.color = "var(--text-primary)"; }}
                     onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text-secondary)"; }}
                   >
@@ -95,8 +92,8 @@ export default function Layout({ children }) {
                 )}
                 <Link
                   to="/login"
-                  className="text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200"
-                  style={{ color: "var(--text-secondary)" }}
+                  className="text-xs font-medium px-3 py-1.5 rounded-full transition-all duration-200"
+                  style={{ color: "var(--text-secondary)", border: "1px solid var(--border-subtle)" }}
                   onMouseEnter={e => { e.currentTarget.style.background = "var(--bg-card-hover)"; e.currentTarget.style.color = "var(--text-primary)"; }}
                   onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text-secondary)"; }}
                 >
@@ -107,8 +104,8 @@ export default function Layout({ children }) {
 
             <button
               onClick={toggle}
-              className="relative w-9 h-9 flex items-center justify-center rounded-xl transition-all duration-300"
-              style={{ color: "var(--text-secondary)" }}
+              className="relative w-9 h-9 flex items-center justify-center rounded-full transition-all duration-300"
+              style={{ color: "var(--text-secondary)", border: "1px solid var(--border-subtle)" }}
               onMouseEnter={e => { e.currentTarget.style.background = "var(--bg-card-hover)"; e.currentTarget.style.color = "var(--text-primary)"; }}
               onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text-secondary)"; }}
               aria-label="Toggle theme"
@@ -121,7 +118,7 @@ export default function Layout({ children }) {
         </div>
       </header>
 
-      <main className="relative z-10 max-w-5xl mx-auto px-6 py-16">
+      <main className="page-shell relative z-10 py-14 sm:py-16 lg:py-18">
         {children}
       </main>
     </div>
