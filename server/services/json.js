@@ -1,4 +1,4 @@
-import { stripJson } from "./groq.js";
+import { chat, stripJson } from "./groq.js";
 
 export function parseValidatedJson(raw, label, validate) {
   let parsed;
@@ -11,6 +11,27 @@ export function parseValidatedJson(raw, label, validate) {
 
   if (validate) validate(parsed);
   return parsed;
+}
+
+// LLM calls occasionally return malformed/incomplete JSON (truncation, a
+// stray field). Retrying the whole generate+validate cycle a couple of
+// times resolves the vast majority of these transiently, instead of
+// failing the whole request on a single hiccup.
+export async function chatJson(prompt, systemPrompt, label, validate, { retries = 2, baseDelayMs = 400 } = {}) {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const raw = await chat(prompt, systemPrompt);
+      return parseValidatedJson(raw, label, validate);
+    } catch (err) {
+      lastErr = err;
+      if (attempt < retries) {
+        console.warn(`${label} generation failed (attempt ${attempt + 1}/${retries + 1}): ${err.message}`);
+        await new Promise((resolve) => setTimeout(resolve, baseDelayMs * (attempt + 1)));
+      }
+    }
+  }
+  throw lastErr;
 }
 
 export function ensureObject(value, label) {

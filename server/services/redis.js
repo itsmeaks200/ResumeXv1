@@ -1,7 +1,7 @@
 import Redis from "ioredis";
 
 // REDIS_URL is optional.
-// If not set, this module exports null and interview-ws.js falls back to the
+// If not set, this module exports null and session-store.js falls back to an
 // in-memory Map. This keeps the dev experience working without a Redis instance.
 let redis = null;
 
@@ -15,8 +15,8 @@ if (process.env.REDIS_URL) {
   });
 
   redis.on("connect", () => console.log("Redis connected"));
-  redis.on("error",   (err) => console.error("Redis error:", err.message));
-  redis.on("close",   () => console.warn("Redis connection closed"));
+  redis.on("error", (err) => console.error("Redis error:", err.message));
+  redis.on("close", () => console.warn("Redis connection closed"));
 } else {
   console.log("REDIS_URL not set — using in-memory session store (single-instance only)");
 }

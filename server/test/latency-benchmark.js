@@ -3,7 +3,7 @@
 //
 // Run:   node test/latency-benchmark.js
 //
-// Requires: GROQ_API_KEY and GEMINI_API_KEY in ../.env
+// Requires: GROQ_API_KEY in ../.env
 // Does NOT require MongoDB (standalone benchmark)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -197,7 +197,7 @@ async function main() {
   console.log("╚══════════════════════════════════════════════════════════════╝");
   console.log(`\nTimestamp: ${new Date().toISOString()}`);
   console.log(`Model: llama-3.3-70b-versatile (via Groq)`);
-  console.log(`TTS: Gemini 2.5 Flash → Groq Orpheus fallback`);
+  console.log(`TTS: Groq Orpheus`);
 
   const results = {};
 

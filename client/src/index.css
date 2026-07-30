@@ -4,49 +4,54 @@
 /* ─── Design Tokens ─────────────────────────────────────────── */
 :root {
   --font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
 
-  /* Light theme (default) */
-  --bg-primary: #f4f2ed;
+  /* Light theme (default) — warm paper background, ink typography */
+  --bg-primary: #f7f5f1;
   --bg-secondary: #ffffff;
-  --bg-card: rgba(255, 255, 255, 0.82);
-  --bg-card-hover: rgba(255, 255, 255, 0.96);
-  --bg-surface: rgba(15, 23, 42, 0.03);
-  --border-subtle: rgba(15, 23, 42, 0.08);
-  --border-glow: rgba(15, 23, 42, 0.14);
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #64748b;
+  --bg-card: #ffffff;
+  --bg-card-hover: #fcfbf8;
+  --bg-surface: #f1efe9;
+  --border-subtle: rgba(22, 21, 15, 0.09);
+  --border-glow: rgba(22, 21, 15, 0.18);
+  --text-primary: #16150f;
+  --text-secondary: #56534a;
+  --text-muted: #8c8878;
+  --ink: #16150f;
+  --ink-hover: #2b2a22;
 
-  /* Accent gradient */
+  /* Accent — used sparingly (live indicators, focus rings, small marks) */
   --accent-start: #0f766e;
   --accent-mid: #0ea5a3;
   --accent-end: #2563eb;
-  --accent-glow: rgba(14, 165, 163, 0.12);
+  --accent-glow: rgba(15, 118, 110, 0.1);
 
   /* Semantic */
-  --success: #0f766e;
-  --success-glow: rgba(15, 118, 110, 0.1);
+  --success: #157a4a;
+  --success-glow: rgba(21, 122, 74, 0.1);
   --warning: #b45309;
   --warning-glow: rgba(180, 83, 9, 0.1);
-  --danger: #b91c1c;
-  --danger-glow: rgba(185, 28, 28, 0.1);
+  --danger: #b3261e;
+  --danger-glow: rgba(179, 38, 30, 0.1);
 }
 
 .dark {
-  --bg-primary: #0f172a;
-  --bg-secondary: #111827;
-  --bg-card: rgba(15, 23, 42, 0.8);
-  --bg-card-hover: rgba(15, 23, 42, 0.94);
+  --bg-primary: #121210;
+  --bg-secondary: #171714;
+  --bg-card: #1c1c18;
+  --bg-card-hover: #232320;
   --bg-surface: rgba(255, 255, 255, 0.04);
-  --border-subtle: rgba(148, 163, 184, 0.14);
-  --border-glow: rgba(148, 163, 184, 0.22);
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
-  --accent-glow: rgba(14, 165, 163, 0.2);
-  --success-glow: rgba(15, 118, 110, 0.18);
+  --border-subtle: rgba(237, 234, 224, 0.1);
+  --border-glow: rgba(237, 234, 224, 0.2);
+  --text-primary: #f5f3ec;
+  --text-secondary: #c9c6ba;
+  --text-muted: #8e8b7e;
+  --ink: #f5f3ec;
+  --ink-hover: #ffffff;
+  --accent-glow: rgba(14, 165, 163, 0.16);
+  --success-glow: rgba(21, 122, 74, 0.18);
   --warning-glow: rgba(180, 83, 9, 0.18);
-  --danger-glow: rgba(185, 28, 28, 0.16);
+  --danger-glow: rgba(179, 38, 30, 0.18);
 }
 
 /* ─── Base Reset ────────────────────────────────────────────── */
@@ -62,97 +67,19 @@ body {
   color: var(--text-primary);
   line-height: 1.6;
   min-height: 100vh;
-  background-image:
-    radial-gradient(circle at top left, rgba(14, 165, 163, 0.12), transparent 26%),
-    radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 24%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.56), transparent 32%);
 }
 
-.dark body {
-  background-image:
-    radial-gradient(circle at top left, rgba(14, 165, 163, 0.14), transparent 26%),
-    radial-gradient(circle at top right, rgba(37, 99, 235, 0.1), transparent 24%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 30%);
-}
-
-/* ─── Animated Background Mesh ──────────────────────────────── */
+/* A single, quiet vignette instead of animated gradient orbs — flat and calm */
 .bg-mesh {
   position: fixed;
   inset: 0;
   z-index: 0;
-  overflow: hidden;
   pointer-events: none;
+  background-image: radial-gradient(circle at 50% 0%, rgba(15, 118, 110, 0.06), transparent 42%);
 }
 
-.bg-mesh::before,
-.bg-mesh::after,
-.bg-mesh .orb-3 {
-  content: '';
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(140px);
-  opacity: 0.22;
-  will-change: transform;
-}
-
-.bg-mesh::before {
-  width: 520px;
-  height: 520px;
-  background: radial-gradient(circle, rgba(14, 165, 163, 0.28) 0%, transparent 68%);
-  top: -180px;
-  left: -120px;
-  animation: float-orb-1 28s ease-in-out infinite;
-}
-
-.bg-mesh::after {
-  width: 460px;
-  height: 460px;
-  background: radial-gradient(circle, rgba(37, 99, 235, 0.2) 0%, transparent 68%);
-  bottom: -140px;
-  right: -120px;
-  animation: float-orb-2 24s ease-in-out infinite;
-}
-
-.bg-mesh .orb-3 {
-  width: 360px;
-  height: 360px;
-  background: radial-gradient(circle, rgba(245, 158, 11, 0.12) 0%, transparent 70%);
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  animation: float-orb-3 32s ease-in-out infinite;
-  opacity: 0.12;
-}
-
-@keyframes float-orb-1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(80px, 60px) scale(1.1); }
-  66% { transform: translate(-40px, 30px) scale(0.95); }
-}
-
-@keyframes float-orb-2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(-60px, -40px) scale(1.05); }
-  66% { transform: translate(50px, -60px) scale(0.9); }
-}
-
-@keyframes float-orb-3 {
-  0%, 100% { transform: translate(-50%, -50%) scale(1); }
-  25% { transform: translate(-40%, -60%) scale(1.15); }
-  50% { transform: translate(-60%, -45%) scale(0.9); }
-  75% { transform: translate(-45%, -55%) scale(1.05); }
-}
-
-/* Noise overlay */
-.bg-noise {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0.025;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  background-size: 256px;
+.dark .bg-mesh {
+  background-image: radial-gradient(circle at 50% 0%, rgba(14, 165, 163, 0.08), transparent 42%);
 }
 
 .page-shell {
@@ -163,43 +90,70 @@ body {
   padding-inline: 1.5rem;
 }
 
-.surface {
+/* ─── Surfaces — flat, bordered, quiet shadows (no glass/blur) ─────────── */
+.surface,
+.surface-strong,
+.glass-card,
+.glass-card-static {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
-  border-radius: 22px;
-  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(22, 21, 15, 0.04);
 }
 
-.surface-strong {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.82));
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 26px;
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.1);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+.glass-card {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.glass-card:hover {
+  border-color: var(--border-glow);
+  box-shadow: 0 6px 20px rgba(22, 21, 15, 0.06);
 }
 
 .surface-muted {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: 18px;
+  border-radius: 14px;
 }
 
 .section-label {
-  letter-spacing: 0.18em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* Tally-style section marker — "◇ proof" */
+.label-diamond {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.label-diamond::before {
+  content: '◇';
+  color: var(--accent-start);
+}
+
+.stat-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 .page-title {
-  font-size: clamp(2.15rem, 4vw, 3.5rem);
-  line-height: 1.02;
-  letter-spacing: -0.045em;
-  font-weight: 650;
+  font-size: clamp(2rem, 3.6vw, 3.1rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-weight: 600;
 }
 
 .page-subtitle {
@@ -207,62 +161,27 @@ body {
   font-size: 1rem;
   line-height: 1.7;
 }
-.bg-noise {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0.025;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  background-size: 256px;
-}
 
-/* ─── Glass Utilities ───────────────────────────────────────── */
-.glass-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: 22px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
-}
-
-.glass-card:hover {
-  background: var(--bg-card-hover);
-  border-color: rgba(148, 163, 184, 0.24);
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
-}
-
-.glass-card-static {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: 22px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-
+/* ─── Inputs ────────────────────────────────────────────────── */
 .glass-input {
-  background: rgba(255, 255, 255, 0.84);
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 16px;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  transition: all 0.3s ease;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
   color: var(--text-primary);
 }
 
 .glass-input:focus {
   outline: none;
   border-color: var(--accent-start);
-  box-shadow: 0 0 0 3px rgba(14, 165, 163, 0.14), inset 0 0 20px rgba(14, 165, 163, 0.04);
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 .glass-input::placeholder {
   color: var(--text-muted);
 }
 
-/* ─── Gradient Utilities ────────────────────────────────────── */
+/* ─── Buttons — solid ink, not gradient. Quiet, confident, minimal ─────── */
 .gradient-text {
   background: linear-gradient(135deg, var(--accent-start), var(--accent-mid), var(--accent-end));
   -webkit-background-clip: text;
@@ -271,23 +190,20 @@ body {
 }
 
 .gradient-btn {
-  background: linear-gradient(135deg, var(--accent-start), var(--accent-mid), var(--accent-end));
-  background-size: 200% 200%;
-  color: white;
+  background: var(--ink);
+  color: var(--bg-primary);
   border: none;
-  border-radius: 14px;
+  border-radius: 999px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 20px var(--accent-glow);
-  position: relative;
-  overflow: hidden;
+  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 1px 2px rgba(22, 21, 15, 0.12);
 }
 
 .gradient-btn:hover {
+  background: var(--ink-hover);
   transform: translateY(-1px);
-  box-shadow: 0 12px 30px rgba(99, 102, 241, 0.22);
-  background-position: 100% 0;
+  box-shadow: 0 8px 20px rgba(22, 21, 15, 0.16);
 }
 
 .gradient-btn:active {
@@ -301,41 +217,18 @@ body {
   box-shadow: none;
 }
 
-.gradient-btn::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.12) 50%, transparent 60%);
-  background-size: 200% 200%;
-  animation: shimmer 3s ease-in-out infinite;
-}
-
 .gradient-border {
   position: relative;
   background: var(--bg-card);
-  border-radius: 24px;
-}
-
-.gradient-border::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: 25px;
-  background: linear-gradient(135deg, var(--accent-start), transparent 40%, transparent 60%, var(--accent-end));
-  z-index: -1;
-  opacity: 0.35;
-  transition: opacity 0.3s ease;
-}
-
-.gradient-border:hover::before {
-  opacity: 0.8;
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
 }
 
 /* ─── Animation Keyframes ───────────────────────────────────── */
 @keyframes fade-in-up {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(14px);
   }
   to {
     opacity: 1;
@@ -344,14 +237,14 @@ body {
 }
 
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes scale-in {
   from {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.96);
   }
   to {
     opacity: 1;
@@ -359,13 +252,8 @@ body {
   }
 }
 
-@keyframes shimmer {
-  0%, 100% { background-position: -200% -200%; }
-  50% { background-position: 200% 200%; }
-}
-
 @keyframes pulse-ring {
-  0% { transform: scale(1); opacity: 0.6; }
+  0% { transform: scale(1); opacity: 0.5; }
   100% { transform: scale(1.8); opacity: 0; }
 }
 
@@ -389,12 +277,6 @@ body {
   50% { transform: scaleY(1); }
 }
 
-@keyframes gradient-flow {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-6px); }
@@ -407,8 +289,8 @@ body {
 
 /* ─── Animation Utilities ───────────────────────────────────── */
 .fade-in { animation: fade-in 0.3s ease forwards; }
-.fade-in-up { animation: fade-in-up 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-.scale-in { animation: scale-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.fade-in-up { animation: fade-in-up 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.scale-in { animation: scale-in 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
 .pulse-ring { animation: pulse-ring 1.5s ease-out infinite; }
 .float { animation: float 3s ease-in-out infinite; }
 
@@ -423,60 +305,6 @@ body {
 .stagger-4 { animation-delay: 0.2s; opacity: 0; }
 .stagger-5 { animation-delay: 0.25s; opacity: 0; }
 .stagger-6 { animation-delay: 0.3s; opacity: 0; }
-
-/* ─── Light Theme Overrides ─────────────────────────────────── */
-:root:not(.dark) {
-  --bg-primary: #f8fafc;
-  --bg-secondary: #eef2ff;
-  --bg-card: rgba(255, 255, 255, 0.84);
-  --bg-card-hover: rgba(255, 255, 255, 0.96);
-  --bg-surface: rgba(255, 255, 255, 0.72);
-  --border-subtle: rgba(15, 23, 42, 0.08);
-  --border-glow: rgba(15, 23, 42, 0.12);
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #64748b;
-  --accent-glow: rgba(99, 102, 241, 0.12);
-}
-
-:root:not(.dark) body {
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  background-image:
-    radial-gradient(circle at top left, rgba(99, 102, 241, 0.12), transparent 28%),
-    radial-gradient(circle at top right, rgba(20, 184, 166, 0.08), transparent 24%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.65), transparent 35%);
-}
-
-:root:not(.dark) .bg-mesh::before,
-:root:not(.dark) .bg-mesh::after,
-:root:not(.dark) .bg-mesh .orb-3 {
-  opacity: 0.08;
-}
-
-:root:not(.dark) .bg-noise {
-  opacity: 0.015;
-}
-
-:root:not(.dark) .glass-card {
-  background: var(--bg-card);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-}
-
-:root:not(.dark) .glass-card:hover {
-  background: var(--bg-card-hover);
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
-}
-
-:root:not(.dark) .glass-card-static {
-  background: var(--bg-card);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-}
-
-:root:not(.dark) .glass-input {
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--text-primary);
-}
 
 /* ─── Scrollbar ─────────────────────────────────────────────── */
 ::-webkit-scrollbar {

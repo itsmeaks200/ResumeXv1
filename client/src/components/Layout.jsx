@@ -19,28 +19,22 @@ export default function Layout({ children }) {
 
   return (
     <div className="relative min-h-screen overflow-x-hidden" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
-      <div className="bg-mesh"><div className="orb-3" /></div>
-      <div className="bg-noise" />
+      <div className="bg-mesh" />
 
       <header
         className="sticky top-0 z-50"
         style={{
-          background: dark ? "rgba(11, 16, 32, 0.72)" : "rgba(248, 250, 252, 0.78)",
-          backdropFilter: "blur(22px)",
-          WebkitBackdropFilter: "blur(22px)",
+          background: "var(--bg-secondary)",
           borderBottom: "1px solid var(--border-subtle)",
         }}
       >
         <div className="page-shell h-16 flex items-center justify-between">
           <Link to={user ? "/dashboard" : "/"} className="flex items-center gap-2.5 group">
             <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-105 group-hover:shadow-lg"
-              style={{
-                background: "linear-gradient(135deg, var(--accent-start), var(--accent-end))",
-                boxShadow: "0 2px 12px var(--accent-glow)",
-              }}
+              className="w-8 h-8 rounded-lg flex items-center justify-center transition-transform duration-300 group-hover:scale-105"
+              style={{ background: "var(--ink)" }}
             >
-              <Zap size={15} className="text-white" />
+              <Zap size={15} style={{ color: "var(--bg-primary)" }} />
             </div>
             <span className="font-semibold text-sm tracking-tight" style={{ color: "var(--text-primary)" }}>
               ResumeX

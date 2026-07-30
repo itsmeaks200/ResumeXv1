@@ -92,8 +92,8 @@ export default function Home() {
         style={{
           borderStyle: file ? "solid" : "dashed",
           borderWidth: "1px",
-          borderColor: dragging ? "var(--accent-start)" : file ? "rgba(99, 102, 241, 0.28)" : "var(--border-subtle)",
-          boxShadow: dragging ? "0 0 0 1px rgba(99, 102, 241, 0.2), 0 24px 60px rgba(2, 6, 23, 0.24)" : "none",
+          borderColor: dragging ? "var(--accent-start)" : file ? "var(--border-glow)" : "var(--border-subtle)",
+          boxShadow: dragging ? "0 10px 30px rgba(22, 21, 15, 0.08)" : "none",
           transform: dragging ? "translateY(-1px)" : "translateY(0)",
         }}
       >

@@ -4,15 +4,14 @@
 // Usage:
 //   import { metrics } from "./metrics.js";
 //
-//   const end = metrics.startTimer("sessionId", "tts_gemini");
-//   await synthesizeGemini(text);
+//   const end = metrics.startTimer("sessionId", "tts_total");
+//   await synthesize(text);
 //   end();                              // records duration
-//   end({ hit: true, provider: "gemini" }); // optional metadata
+//   end({ textLength: text.length });   // optional metadata
 //
 //   metrics.record("sessionId", "json_parse", { success: true });
-//   metrics.record("sessionId", "pregen_hit", { hit: true, waitMs: 0 });
 //
-//   metrics.getSummary();  // { stages: { tts_gemini: { p50, p95, mean, count } }, ... }
+//   metrics.getSummary();  // { stages: { tts_total: { p50, p95, mean, count } }, ... }
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MAX_ENTRIES = 1000; // ring buffer size per stage
@@ -34,7 +33,7 @@ class Metrics {
    * Returns a function to call when the stage completes.
    *
    * @param {string} sessionId - Request/session identifier
-   * @param {string} stage - Pipeline stage name (e.g. "llm_eval", "tts_gemini")
+   * @param {string} stage - Pipeline stage name (e.g. "llm_eval", "tts_total")
    * @returns {(meta?: object) => number} - Call to stop timer; returns duration in ms
    */
   startTimer(sessionId, stage) {

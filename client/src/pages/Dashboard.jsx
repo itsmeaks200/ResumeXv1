@@ -236,12 +236,12 @@ function ActionPanel({ resumeId, mode, onClose, onAnalyzeDone, onInterviewStart 
                     onClick={() => setSelectedDuration(d)}
                     className="flex flex-col items-center gap-0.5 py-2.5 px-2 rounded-full transition-all duration-200"
                     style={{
-                      background: active ? "linear-gradient(135deg, rgba(99,102,241,0.18), rgba(20,184,166,0.12))" : "var(--bg-card-hover)",
-                      border: active ? "1px solid rgba(99,102,241,0.32)" : "1px solid var(--border-subtle)",
+                      background: active ? "var(--ink)" : "var(--bg-card-hover)",
+                      border: active ? "1px solid var(--ink)" : "1px solid var(--border-subtle)",
                     }}
                   >
-                    <span className="text-sm font-bold" style={{ color: active ? "var(--accent-mid)" : "var(--text-primary)" }}>{d.label}</span>
-                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>{d.desc}</span>
+                    <span className="text-sm font-bold" style={{ color: active ? "var(--bg-primary)" : "var(--text-primary)" }}>{d.label}</span>
+                    <span className="text-xs" style={{ color: active ? "var(--bg-primary)" : "var(--text-muted)", opacity: active ? 0.7 : 1 }}>{d.desc}</span>
                   </button>
                 );
               })}
@@ -352,8 +352,8 @@ export default function Dashboard() {
                 style={{
                   borderStyle: "solid",
                   borderWidth: "1px",
-                  borderColor: isExpanded ? "rgba(99,102,241,0.3)" : "var(--border-subtle)",
-                  boxShadow: isExpanded ? "0 0 0 1px rgba(99,102,241,0.12), 0 24px 60px rgba(2, 6, 23, 0.26)" : "none",
+                  borderColor: isExpanded ? "var(--border-glow)" : "var(--border-subtle)",
+                  boxShadow: isExpanded ? "0 10px 30px rgba(22, 21, 15, 0.08)" : "none",
                 }}
               >
                 {/* Resume row */}
@@ -380,9 +380,9 @@ export default function Dashboard() {
                       onClick={() => openPanel(resume._id, "ats")}
                       className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-all duration-200"
                       style={{
-                        background: isExpanded && expandedMode === "ats" ? "rgba(99,102,241,0.12)" : "var(--bg-card-hover)",
-                        color: isExpanded && expandedMode === "ats" ? "var(--accent-mid)" : "var(--text-secondary)",
-                        border: `1px solid ${isExpanded && expandedMode === "ats" ? "rgba(99,102,241,0.24)" : "var(--border-subtle)"}`,
+                        background: isExpanded && expandedMode === "ats" ? "var(--ink)" : "var(--bg-card-hover)",
+                        color: isExpanded && expandedMode === "ats" ? "var(--bg-primary)" : "var(--text-secondary)",
+                        border: `1px solid ${isExpanded && expandedMode === "ats" ? "var(--ink)" : "var(--border-subtle)"}`,
                       }}
                     >
                       <Target size={12} /> ATS
@@ -391,9 +391,9 @@ export default function Dashboard() {
                       onClick={() => openPanel(resume._id, "interview")}
                       className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-all duration-200"
                       style={{
-                        background: isExpanded && expandedMode === "interview" ? "rgba(99,102,241,0.12)" : "var(--bg-card-hover)",
-                        color: isExpanded && expandedMode === "interview" ? "var(--accent-mid)" : "var(--text-secondary)",
-                        border: `1px solid ${isExpanded && expandedMode === "interview" ? "rgba(99,102,241,0.24)" : "var(--border-subtle)"}`,
+                        background: isExpanded && expandedMode === "interview" ? "var(--ink)" : "var(--bg-card-hover)",
+                        color: isExpanded && expandedMode === "interview" ? "var(--bg-primary)" : "var(--text-secondary)",
+                        border: `1px solid ${isExpanded && expandedMode === "interview" ? "var(--ink)" : "var(--border-subtle)"}`,
                       }}
                     >
                       <Mic size={12} /> Interview

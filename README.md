@@ -9,8 +9,8 @@
 - **Resume Parsing** — Upload a PDF resume and extract structured data automatically
 - **AI Analysis** — Get an ATS score, skill gap analysis, and improvement suggestions powered by Groq
 - **GitHub Integration** — Optionally link a GitHub account to enrich project context
-- **Mock Interviews** — Real-time AI interview sessions over WebSocket with text-to-speech (Gemini TTS / Groq TTS fallback)
-- **Interview Reports** — Post-interview scoring and detailed feedback
+- **Mock Interviews** — Voice-only AI interview over WebSocket: two fixed questions (background + a project), spoken via Groq TTS, answers captured by voice-activity detection and transcribed server-side with Whisper
+- **Interview Reports** — Post-interview scoring and detailed feedback, saved to your account
 - **Auth** — JWT-based registration & login with protected routes
 
 ---
@@ -21,7 +21,7 @@
 |-------|-----------|
 | Frontend | React 19, Vite 8, Tailwind CSS v4, React Router v7 |
 | Backend | Node.js, Express 5, MongoDB (Mongoose) |
-| AI | Groq SDK (LLaMA), Gemini API (TTS) |
+| AI | Groq SDK (LLaMA for chat/eval, Whisper for transcription, Orpheus for TTS) |
 | Real-time | WebSocket (`ws`) |
 | Auth | JWT + bcrypt |
 
@@ -40,7 +40,7 @@ ResumeX1/
 │   └── package.json
 │
 ├── server/                 # Express backend
-│   ├── routes/             # /api/parse, /api/analyze, /api/auth, /api/resumes, /api/interview
+│   ├── routes/             # /api/parse, /api/analyze, /api/auth, /api/resumes, /api/interviews
 │   ├── services/           # GitHub API, AI services
 │   ├── models/             # Mongoose models
 │   ├── middleware/         # Auth middleware
@@ -61,8 +61,7 @@ ResumeX1/
 
 - Node.js 18+
 - MongoDB (local or [Atlas](https://www.mongodb.com/atlas))
-- [Groq API key](https://console.groq.com/)
-- [Google AI Studio key](https://aistudio.google.com/apikey) (for Gemini TTS)
+- [Groq API key](https://console.groq.com/) (used for chat, Whisper transcription, and TTS)
 
 ### 1. Clone & configure environment
 
@@ -76,9 +75,7 @@ Edit `.env` and fill in your keys:
 
 ```env
 GROQ_API_KEY=your_groq_api_key_here
-GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_TTS_VOICE=Kore          # Optional — change voice
-TTS_VOICE=hannah               # Groq TTS fallback voice
+TTS_VOICE=hannah               # Groq Orpheus TTS voice
 PORT=5000
 MONGODB_URI=mongodb://localhost:27017/resumex
 JWT_SECRET=change_this_to_a_long_random_secret
@@ -118,10 +115,8 @@ Visit [http://localhost:5173](http://localhost:5173).
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `GROQ_API_KEY` | ✅ | Powers resume analysis and interview AI |
-| `GEMINI_API_KEY` | ✅ | Gemini TTS for interview voice responses |
-| `GEMINI_TTS_VOICE` | ❌ | Voice name (default: `Kore`) |
-| `TTS_VOICE` | ❌ | Groq TTS fallback voice (default: `hannah`) |
+| `GROQ_API_KEY` | ✅ | Powers resume analysis, interview chat/eval, Whisper transcription, and Orpheus TTS |
+| `TTS_VOICE` | ❌ | Groq Orpheus TTS voice (default: `hannah`) |
 | `PORT` | ❌ | Server port (default: `5000`) |
 | `MONGODB_URI` | ✅ | MongoDB connection string |
 | `JWT_SECRET` | ✅ | Secret for signing JWTs — keep this long and random |
@@ -139,7 +134,9 @@ Visit [http://localhost:5173](http://localhost:5173).
 | `POST` | `/api/parse` | Upload and parse a PDF resume |
 | `POST` | `/api/analyze` | Run AI analysis on parsed resume |
 | `GET` | `/api/resumes` | List saved resumes (auth required) |
-| `WS` | `/ws/interview?token=<jwt>` | Real-time interview session (JWT required) |
+| `GET` | `/api/interviews` | List past interview reports (auth required) |
+| `GET` | `/api/interviews/:id` | Get a single interview report (auth required) |
+| `WS` | `/ws/interview?token=<jwt>` | Voice-only interview session — 2 fixed questions (JWT required) |
 | `GET` | `/health` | Server health check |
 
 ---

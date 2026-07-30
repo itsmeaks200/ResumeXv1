@@ -246,19 +246,14 @@ export default function Results() {
                 onClick={() => setSelectedDuration(d)}
                 className="flex flex-col items-center gap-0.5 py-3 px-2 rounded-xl transition-all duration-200"
                 style={{
-                  background: active
-                    ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(20, 184, 166, 0.12))'
-                    : 'var(--bg-card-hover)',
-                  border: active
-                    ? '1px solid rgba(99, 102, 241, 0.32)'
-                    : '1px solid var(--border-subtle)',
-                  boxShadow: active ? '0 0 0 1px rgba(99,102,241,0.12), 0 10px 24px rgba(2, 6, 23, 0.18)' : 'none',
+                  background: active ? 'var(--ink)' : 'var(--bg-card-hover)',
+                  border: active ? '1px solid var(--ink)' : '1px solid var(--border-subtle)',
                 }}
               >
-                <span className="text-sm font-bold" style={{ color: active ? 'var(--accent-mid)' : 'var(--text-primary)' }}>
+                <span className="text-sm font-bold" style={{ color: active ? 'var(--bg-primary)' : 'var(--text-primary)' }}>
                   {d.label}
                 </span>
-                <span className="text-xs" style={{ color: active ? 'var(--accent-end)' : 'var(--text-muted)' }}>{d.desc}</span>
+                <span className="text-xs" style={{ color: active ? 'var(--bg-primary)' : 'var(--text-muted)', opacity: active ? 0.7 : 1 }}>{d.desc}</span>
               </button>
             );
           })}

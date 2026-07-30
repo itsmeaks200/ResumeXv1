@@ -14,6 +14,7 @@ import parseRoute from "./routes/parse.js";
 import analyzeRoute from "./routes/analyze.js";
 import authRoute from "./routes/auth.js";
 import resumesRoute from "./routes/resumes.js";
+import interviewsRoute from "./routes/interviews.js";
 import { requireAuth } from "./middleware/auth.js";
 import { rateLimit } from "./middleware/rateLimit.js";
 import { metrics } from "./services/metrics.js";
@@ -46,6 +47,7 @@ app.use("/api/parse", parseLimiter, parseRoute);
 app.use("/api/analyze", analyzeLimiter, analyzeRoute);
 app.use("/api/auth", authLimiter, authRoute);
 app.use("/api/resumes", resumesRoute);
+app.use("/api/interviews", interviewsRoute);
 app.get("/health", (_, res) => res.json({ status: "ok" }));
 
 // GenAI pipeline metrics — latency percentiles, pre-gen hit rate, TTS fallback rate

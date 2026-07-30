@@ -1,109 +1,45 @@
+import { randomUUID } from "crypto";
+import jwt from "jsonwebtoken";
 import {
   createSession,
   generateIntro,
   generateNextQuestion,
-  evaluateAnswer,
   generateFollowUp,
+  evaluateAnswer,
   generateReport,
 } from "../services/interview-graph.js";
-import { analyzeGithubRepos } from "../services/github.js";
 import { synthesize } from "../services/tts.js";
-import redis from "../services/redis.js";
+import { transcribeAudio } from "../services/groq.js";
 import { metrics } from "../services/metrics.js";
-import jwt from "jsonwebtoken";
+import Interview from "../models/Interview.js";
+import { sessionGet, sessionSave, sessionDelete, startSessionSweep } from "../services/session-store.js";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Session storage abstraction
-//
-// When REDIS_URL is set:
-//   - Session state JSON   →  Redis string key  `session:<id>`  (TTL = duration + 10 min)
-//
-// When REDIS_URL is NOT set (redis === null):
-//   - Everything falls back to the in-memory Map below (original behaviour)
-//
-// preNextPromise is always kept in localPromises — Promises are not serialisable
-// and the pre-gen is a latency optimisation, not critical state. If the server
-// handling a "next" message didn't run the pre-gen (different instance or restart),
-// it falls back to generating synchronously — which is already the fallback path.
-// ─────────────────────────────────────────────────────────────────────────────
+startSessionSweep();
 
-// Fallback in-memory store (used when Redis is not configured)
-const memSessions = new Map();
+// Message types that mutate session state — serialized per-connection so a
+// double-fired message (flaky retry, double click) can't race against
+// itself and corrupt the in-flight session.
+const MUTATING_TYPES = new Set(["start", "resume", "intro_done", "answer_done", "retry_advance"]);
 
-// Local ephemeral store for non-serialisable Promises only (all instances)
-const localPromises = new Map(); // sessionId → Promise<{action, audio}|null>
-
-// TTL: interview duration (minutes) converted to seconds, plus 10 minute grace period
-function sessionTTL(durationMin) {
-  return durationMin * 60 + 600;
-}
-
-// ── Redis helpers ─────────────────────────────────────────────────────────────
-
-async function sessionGet(sessionId) {
-  if (!redis) return memSessions.get(sessionId) ?? null;
-  const raw = await redis.get(`session:${sessionId}`);
-  return raw ? JSON.parse(raw) : null;
-}
-
-async function sessionSet(sessionId, session) {
-  if (!redis) {
-    // In-memory path: keep the full entry
-    const existing = memSessions.get(sessionId) ?? {};
-    memSessions.set(sessionId, { ...existing, session });
-    return;
-  }
-  const ttl = sessionTTL(session.duration ?? 30);
-  await redis.set(`session:${sessionId}`, JSON.stringify(session), "EX", ttl);
-}
-
-async function sessionDelete(sessionId) {
-  if (!redis) { memSessions.delete(sessionId); return; }
-  await redis.del(`session:${sessionId}`);
-}
-
-function clearSessionState(sessionId) {
-  if (!sessionId) return;
-  localPromises.delete(sessionId);
-  localPromises.delete(`${sessionId}:evalTs`);
-  metrics.clearRequest(sessionId);
-}
-
-
-
-// ─────────────────────────────────────────────────────────────────────────────
+// Client-controlled inputs are otherwise unbounded — clamp them so a
+// malformed/malicious "start" payload can't blow up prompt size or turn the
+// interview's own safety cap into an unbounded LLM-cost bomb.
+const ALLOWED_DURATIONS = [15, 30, 60];
+const MAX_RESUME_JSON_LEN = 60_000;
+const MAX_JD_LEN = 6_000;
 
 function send(ws, type, payload = {}) {
   if (ws.readyState === 1) ws.send(JSON.stringify({ type, ...payload }));
 }
 
-// Pre-generate next question + TTS during feedback reading window.
-// Reads its own fresh session copy to avoid lost-update races with the
-// message handler's session reference (F3 fix).
-function startPreGen(action, sessionId) {
-  const promise = (async () => {
-    try {
-      const session = await sessionGet(sessionId);
-      if (!session) return null;
-
-      if (action === "followup") {
-        await generateFollowUp(session);
-        await sessionSet(sessionId, session);
-        const audio = await synthesize(session.currentFollowUp.question);
-        return { action, audio };
-      } else {
-        const q = await generateNextQuestion(session);
-        await sessionSet(sessionId, session);
-        const audio = await synthesize(q.question);
-        return { action, audio };
-      }
-    } catch (err) {
-      console.warn("Pre-gen failed:", err.message);
-      return null;
-    }
-  })();
-  localPromises.set(sessionId, promise);
-  return promise;
+function decodeAudio(base64) {
+  if (!base64) return null;
+  try {
+    const buf = Buffer.from(base64, "base64");
+    return buf.length > 0 ? buf : null;
+  } catch {
+    return null;
+  }
 }
 
 export function handleInterviewSocket(ws, req) {
@@ -114,17 +50,17 @@ export function handleInterviewSocket(ws, req) {
     const token = url.searchParams.get("token");
     if (!token) throw new Error("No token provided");
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    userId = payload.id; // Kept for future per-user session scoping
+    userId = payload.id;
   } catch {
     ws.close(4401, "Authentication required");
     return;
   }
 
   let sessionId = null;
+  let session = null; // local copy — must be sessionSave()'d after every mutation to stay in sync with Redis
+  let busy = false; // guards against overlapping mutating messages on one connection
 
-  // Liveness detection — ping/pong pattern (F12 fix).
-  // If the client doesn't respond with a pong before the next sweep,
-  // the connection is considered dead and is terminated.
+  // Liveness detection — ping/pong pattern.
   ws.isAlive = true;
   ws.on("pong", () => { ws.isAlive = true; });
 
@@ -134,243 +70,240 @@ export function handleInterviewSocket(ws, req) {
     if (ws.readyState === 1) ws.ping();
   }, 25000);
 
+  function timeInfo() {
+    const elapsedMs = session.sessionStartTime ? Date.now() - session.sessionStartTime : 0;
+    return {
+      duration: session.duration,
+      elapsedSec: Math.floor(elapsedMs / 1000),
+      remainingSec: Math.max(0, Math.round(session.duration * 60 - elapsedMs / 1000)),
+    };
+  }
+
+  async function sendQuestion() {
+    const q = await generateNextQuestion(session);
+    const audio = await synthesize(q.question, { sessionId });
+    await sessionSave(sessionId, session);
+    send(ws, "question", {
+      question: q,
+      index: session.questions.length - 1,
+      ...timeInfo(),
+      audio,
+    });
+  }
+
+  async function sendFollowUp() {
+    await generateFollowUp(session);
+    const q = session.currentFollowUp;
+    const audio = await synthesize(q.question, { sessionId });
+    await sessionSave(sessionId, session);
+    send(ws, "question", {
+      question: q,
+      index: session.questions.length - 1,
+      isFollowUp: true,
+      ...timeInfo(),
+      audio,
+    });
+  }
+
+  // Whatever comes after an evaluated answer: the next question, a
+  // follow-up probe, or the final report. Pulled into its own function so
+  // "retry_advance" can re-attempt exactly this step without re-evaluating
+  // the answer that already went through (session.currentQuestion is nulled
+  // out before this ever runs — see answer_done — so a retry can never
+  // double-score the same answer).
+  async function advance() {
+    if (session.nextAction === "done") {
+      send(ws, "status", { message: "Generating your report..." });
+      if (!session.report) {
+        await generateReport(session);
+        await sessionSave(sessionId, session);
+      }
+
+      if (!session.savedInterviewId) {
+        try {
+          const saved = await Interview.create({
+            userId,
+            jobDescription: session.jobDescription,
+            duration: session.duration,
+            report: session.report,
+          });
+          session.savedInterviewId = saved._id;
+          await sessionSave(sessionId, session);
+        } catch (err) {
+          console.error("Failed to save interview report:", err.message);
+        }
+      }
+
+      send(ws, "report", { report: session.report, interviewId: session.savedInterviewId ?? null });
+      await sessionDelete(sessionId);
+      metrics.clearRequest(sessionId);
+      session = null;
+      return;
+    }
+
+    if (session.nextAction === "followup") {
+      await sendFollowUp();
+    } else {
+      await sendQuestion();
+    }
+  }
+
   ws.on("message", async (raw) => {
+    let msg;
+    try { msg = JSON.parse(raw); } catch { return; }
+    const { type, ...data } = msg;
+
+    if (MUTATING_TYPES.has(type)) {
+      if (busy) {
+        send(ws, "error", { message: "Still processing your previous request — please wait a moment." });
+        return;
+      }
+      busy = true;
+    }
+
     // TOP-LEVEL try-catch: any unhandled error sends an error message instead of crashing
     try {
-      let msg;
-      try { msg = JSON.parse(raw); } catch { return; }
-      const { type, ...data } = msg;
-
       // ── start ────────────────────────────────────────────────────────
       if (type === "start") {
-        sessionId = crypto.randomUUID();
-        const endTTFQ = metrics.startTimer(sessionId, "ttfq");  // Time-to-First-Question
-        const session = createSession(
-          data.resume,
-          data.jobDescription,
-          data.duration ?? 30
-        );
+        const duration = ALLOWED_DURATIONS.includes(Number(data.duration)) ? Number(data.duration) : 30;
+        const jobDescription = typeof data.jobDescription === "string" ? data.jobDescription.slice(0, MAX_JD_LEN) : "";
+        const resumeJsonLen = JSON.stringify(data.resume ?? {}).length;
+        if (resumeJsonLen > MAX_RESUME_JSON_LEN) {
+          send(ws, "error", { message: "Resume data is too large to start an interview." });
+          return;
+        }
 
-        // GitHub enrichment + intro generation run in parallel
-        const githubPromise = (async () => {
-          const endGH = metrics.startTimer(sessionId, "github_enrichment_total");
-          const urls = (data.resume?.projects ?? []).map((p) => p.github_url).filter(Boolean);
-          if (urls.length > 0) {
-            try {
-              session.githubProjects = await analyzeGithubRepos(urls);
-              console.log(`GitHub: enriched ${session.githubProjects.length}/${urls.length} projects`);
-              endGH({ found: session.githubProjects.length, total: urls.length });
-            } catch (err) {
-              console.warn("GitHub enrichment failed:", err.message);
-              endGH({ error: err.message });
-            }
-          } else {
-            endGH({ skipped: true });
-          }
-        })();
+        sessionId = randomUUID();
+        const endTTFQ = metrics.startTimer(sessionId, "ttfq"); // Time-to-First-Question
+        session = createSession(data.resume, jobDescription, duration, userId);
+        await sessionSave(sessionId, session);
 
         const endIntro = metrics.startTimer(sessionId, "llm_intro");
-        const [introSpeech] = await Promise.all([generateIntro(session), githubPromise]);
+        const introSpeech = await generateIntro(session);
         endIntro();
         const introAudio = await synthesize(introSpeech, { sessionId });
-
-        // Persist session to Redis (or in-memory Map as fallback).
-        if (!redis) {
-          memSessions.set(sessionId, { session });
-        } else {
-          await sessionSet(sessionId, session);
-        }
+        await sessionSave(sessionId, session);
 
         const ttfqMs = endTTFQ();
         console.log(`[METRIC] TTFQ=${ttfqMs}ms for session ${sessionId}`);
         send(ws, "session_ready", { sessionId });
         send(ws, "intro", { audio: introAudio });
-        // Note: Q1 is NOT pre-generated here. It's generated AFTER the candidate
-        // intro so it can reference what they said.
         return;
       }
 
-      // ── resume (reconnect to existing session) ──────────────────────
+      // ── resume (reconnect within the 10-minute recovery window) ──────
       if (type === "resume") {
         const requestedId = data.sessionId;
         if (!requestedId) { send(ws, "error", { message: "No sessionId provided" }); return; }
 
-        const session = await sessionGet(requestedId);
-        if (!session) {
+        const found = await sessionGet(requestedId);
+        if (!found || found.userId !== userId) {
           send(ws, "resume_failed", { reason: "Session expired or not found" });
           return;
         }
 
         sessionId = requestedId;
+        session = found;
+        await sessionSave(sessionId, session);
         console.log(`Session ${sessionId} resumed (${session.evaluations?.length ?? 0} answers completed)`);
 
-        // Build a state snapshot so the client can restore its UI
-        const elapsedMs = session.sessionStartTime ? Date.now() - session.sessionStartTime : 0;
-        const remainingMin = Math.max(0, session.duration - Math.floor(elapsedMs / 60000));
+        // Re-synthesize the current question's audio — the client shows no
+        // transcript, so without audio the user would have no way to know
+        // what they're being asked.
+        const resumeAudio = session.currentQuestion
+          ? await synthesize(session.currentQuestion.question, { sessionId })
+          : null;
 
         send(ws, "resume_ok", {
           sessionId,
           questionsAnswered: session.evaluations?.length ?? 0,
           currentQuestion: session.currentQuestion,
-          currentFollowUp: session.currentFollowUp,
-          nextAction: session.nextAction,
-          elapsed: Math.floor(elapsedMs / 60000),
-          duration: session.duration,
-          remainingMin,
+          // Lets the client tell "never asked Q1 yet" apart from "mid-interview,
+          // between an answered question and the next one" — those two need
+          // different recovery messages (intro_done vs retry_advance).
+          hasAskedAny: session.questions.length > 0,
+          ...timeInfo(),
+          audio: resumeAudio,
         });
         return;
       }
 
-      // ── all subsequent handlers need a session ────────────────────────
-      const session = await sessionGet(sessionId);
-      if (!session) { send(ws, "error", { message: "Session not found" }); return; }
+      // ── all subsequent handlers need an active session ────────────────
+      if (!session) { send(ws, "error", { message: "Interview not started" }); return; }
 
-      // ── candidate intro (not scored) ─────────────────────────────────
-      if (type === "candidate_intro") {
-        const transcript = data.transcript ?? "";
-
-        session.candidateIntro = transcript;
-        console.log("Candidate intro received, generating Q1 with intro context...");
-
-        // Generate Q1 NOW with the candidate's actual intro as context
-        const q1 = await generateNextQuestion(session);
-        const q1Audio = await synthesize(q1.question);
-
-        // Persist session with intro + Q1 recorded on it
-        await sessionSet(sessionId, session);
-
-        send(ws, "question", {
-          question: q1,
-          index: 0,
-          elapsed: 0,
-          duration: session.duration,
-          audio: q1Audio,
-        });
+      // ── interviewer intro finished playing — ask the first question ──
+      // Routed through advance() (nextAction is still null here, which
+      // falls through to sendQuestion) so a failure here is retryable via
+      // "retry_advance" the same way a mid-interview failure is.
+      if (type === "intro_done") {
+        if (session.questions.length > 0) return; // already asked — ignore duplicate
+        try {
+          await advance();
+        } catch (err) {
+          console.error("Initial question generation failed:", err);
+          send(ws, "error", { code: "advance_failed", message: "Had trouble starting the interview — tap retry." });
+        }
         return;
       }
 
-      // ── answer done ──────────────────────────────────────────────────
+      // ── retry a stalled advance (question/follow-up/report generation
+      //    failed after the answer was already scored) ───────────────────
+      if (type === "retry_advance") {
+        if (session.currentQuestion) return; // already have an active question — nothing to retry
+        try {
+          await advance();
+        } catch (err) {
+          console.error("Retry advance failed:", err);
+          send(ws, "error", { code: "advance_failed", message: "Still couldn't continue the interview. Please try again in a moment." });
+        }
+        return;
+      }
+
+      // ── answer done (audio) ───────────────────────────────────────────
       if (type === "answer_done") {
-        const transcript = data.transcript ?? "";
-
-        if (!transcript.trim()) {
-          send(ws, "error", { message: "No transcript received. Please say more." });
+        if (!session.currentQuestion) {
+          send(ws, "error", { message: "No active question to answer." });
           return;
         }
 
-        send(ws, "transcript_confirmed", { transcript });
+        const audioBuffer = decodeAudio(data.audio);
+        if (!audioBuffer) {
+          send(ws, "error", { message: "No audio received. Please try again." });
+          return;
+        }
+
+        send(ws, "status", { message: "Transcribing your answer..." });
+        let transcript = "";
+        try {
+          transcript = (await transcribeAudio(audioBuffer, data.mimeType || "audio/webm", { sessionId })) ?? "";
+        } catch (err) {
+          console.warn("Answer transcription failed:", err.message);
+        }
+
+        if (!transcript.trim()) {
+          send(ws, "error", { message: "Couldn't hear that clearly. Please try again." });
+          return;
+        }
+
         session.currentAnswer = transcript;
 
         const endEval = metrics.startTimer(sessionId, "llm_evaluation");
-        const { evaluation } = await evaluateAnswer(session);
+        await evaluateAnswer(session);
         endEval();
 
-        const elapsedMs = session.sessionStartTime ? Date.now() - session.sessionStartTime : 0;
-        const remainingMin = Math.max(0, session.duration - Math.floor(elapsedMs / 60000));
+        // The answer is now scored and recorded. Clear currentQuestion
+        // BEFORE attempting to advance so that if question/report
+        // generation fails below, a client retry can only hit
+        // "retry_advance" (which re-attempts advance()) — never
+        // re-evaluate this same answer via a stray answer_done.
+        session.currentQuestion = null;
+        await sessionSave(sessionId, session);
 
-        // Persist updated session (evaluations + nextAction written by evaluateAnswer)
-        await sessionSet(sessionId, session);
-
-        // Track when evaluation was sent — used to calculate pre-gen timing
-        const evaluationSentAt = Date.now();
-        send(ws, "evaluation", { evaluation, remainingMin });
-
-        // Start pre-generating in the background while user reads evaluation
-        if (session.nextAction !== "done") {
-          startPreGen(session.nextAction, sessionId);
-          // Store evaluation send time for pre-gen hit rate calculation
-          localPromises.set(`${sessionId}:evalTs`, evaluationSentAt);
-        }
-        return;
-      }
-
-      // ── next ─────────────────────────────────────────────────────────
-      if (type === "next") {
-        const elapsedMs = session.sessionStartTime ? Date.now() - session.sessionStartTime : 0;
-        const remainingMin = Math.max(0, session.duration - Math.floor(elapsedMs / 60000));
-
-        if (session.nextAction === "done") {
-          send(ws, "status", { message: "Generating your report..." });
-          await generateReport(session);
-          send(ws, "report", { report: session.report });
-          await sessionDelete(sessionId);
-          clearSessionState(sessionId);
-          return;
-        }
-
-        // Await pre-generated content — instant if the Promise finished during
-        // the evaluation reading window, a short wait if still running, null if
-        // pre-gen wasn't run on this instance (different server after reconnect).
-        const prePromise = localPromises.get(sessionId) ?? null;
-        const evaluationSentAt = localPromises.get(`${sessionId}:evalTs`) ?? Date.now();
-        localPromises.delete(sessionId);
-        localPromises.delete(`${sessionId}:evalTs`);
-        const pre = prePromise ? await prePromise : null;
-        const userReadTimeMs = Date.now() - evaluationSentAt;
-
-        // ── Pre-gen hit rate tracking ──────────────────────────────────
-        const preGenHit = pre !== null && pre.action === session.nextAction;
-        metrics.record(sessionId, "pregen_hit", {
-          hit: preGenHit,
-          userReadTimeMs,
-          action: session.nextAction,
-        });
-        console.log(`[METRIC] preGenHit=${preGenHit}, userReadTime=${userReadTimeMs}ms, action=${session.nextAction}`);
-
-        // Re-read session after pre-gen may have mutated + persisted it
-        const freshSession = await sessionGet(sessionId);
-        // Use freshSession if available, fall back to the session read at top
-        // (pre-gen always persists, so freshSession should have the updated state)
-        const s = freshSession ?? session;
-
-        if (s.nextAction === "followup") {
-          if (pre?.action === "followup") {
-            // Pre-gen ready — send immediately (zero TTS delay)
-            send(ws, "followup", {
-              question: s.currentFollowUp,
-              index: s.questions.length - 1,
-              elapsed: Math.floor(elapsedMs / 60000),
-              duration: s.duration,
-              audio: pre.audio,
-            });
-          } else {
-            // Pre-gen failed or ran on another instance — generate now
-            if (!s.currentFollowUp) await generateFollowUp(s);
-            const audio = await synthesize(s.currentFollowUp.question);
-            await sessionSet(sessionId, s);
-            send(ws, "followup", {
-              question: s.currentFollowUp,
-              index: s.questions.length - 1,
-              elapsed: Math.floor(elapsedMs / 60000),
-              duration: s.duration,
-              audio,
-            });
-          }
-        } else {
-          if (pre?.action === "next") {
-            // Pre-gen ready — send immediately
-            send(ws, "question", {
-              question: s.currentQuestion,
-              index: s.questions.length - 1,
-              elapsed: Math.floor(elapsedMs / 60000),
-              duration: s.duration,
-              audio: pre.audio,
-            });
-          } else {
-            // Pre-gen failed or ran on another instance — generate now
-            if (pre === null && s.questions.length === s.evaluations.filter(e => !e.isFollowUp).length) {
-              await generateNextQuestion(s);
-            }
-            const audio = await synthesize(s.currentQuestion.question);
-            await sessionSet(sessionId, s);
-            send(ws, "question", {
-              question: s.currentQuestion,
-              index: s.questions.length - 1,
-              elapsed: Math.floor(elapsedMs / 60000),
-              duration: s.duration,
-              audio,
-            });
-          }
+        try {
+          await advance();
+        } catch (err) {
+          console.error("Advance failed after answer evaluation:", err);
+          send(ws, "error", { code: "advance_failed", message: "Had trouble continuing the interview — tap retry to pick back up." });
         }
         return;
       }
@@ -380,17 +313,16 @@ export function handleInterviewSocket(ws, req) {
     } catch (err) {
       console.error("WS handler error:", err);
       send(ws, "error", { message: "Something went wrong on the server. Please try again." });
+    } finally {
+      busy = false;
     }
   });
 
   ws.on("close", () => {
     clearInterval(pingInterval);
-    clearSessionState(sessionId);
-    // Session keys are intentionally NOT deleted from Redis on disconnect.
-    // A 5-minute grace period (covered by the TTL already set) allows the
-    // client to reconnect and resume. The TTL handles cleanup automatically.
-    // For the in-memory fallback, we delete immediately (no reconnection support).
-    if (!redis && sessionId) memSessions.delete(sessionId);
+    metrics.clearRequest(sessionId);
+    // The session is intentionally left in the store — the recovery-window
+    // TTL/sweep (not this handler) is responsible for evicting it later.
   });
 
   ws.on("error", (err) => console.error("WS error:", err.message));

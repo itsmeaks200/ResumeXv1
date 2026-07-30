@@ -26,7 +26,7 @@ function SkillBar({ label, value }) {
   );
 }
 
-function TranscriptItem({ item, index }) {
+function TranscriptItem({ item }) {
   const [open, setOpen] = useState(false);
   const scoreColor = item.score >= 7 ? "var(--success)" : item.score >= 5 ? "var(--warning)" : "var(--danger)";
   const scoreBg = item.score >= 7 ? "var(--success-glow)" : item.score >= 5 ? "var(--warning-glow)" : "var(--danger-glow)";
@@ -46,11 +46,6 @@ function TranscriptItem({ item, index }) {
           >
             {item.score}/10
           </span>
-          {item.isFollowUp && (
-            <span className="text-xs px-2 py-0.5 rounded-md shrink-0" style={{ background: "rgba(6,182,212,0.1)", color: "var(--accent-end)" }}>
-              probe
-            </span>
-          )}
           {item.type && (
             <span className="text-xs px-2 py-0.5 rounded-md shrink-0" style={{ background: "var(--accent-glow)", color: "var(--accent-mid)" }}>
               {item.type}
@@ -244,7 +239,7 @@ export default function Report() {
             Question-by-Question Breakdown
           </div>
           {r.transcript.map((item, i) => (
-            <TranscriptItem key={i} item={item} index={i} />
+            <TranscriptItem key={i} item={item} />
           ))}
         </div>
       )}
