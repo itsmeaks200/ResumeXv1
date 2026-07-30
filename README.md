@@ -9,7 +9,7 @@
 - **Resume Parsing** — Upload a PDF resume and extract structured data automatically
 - **AI Analysis** — Get an ATS score, skill gap analysis, and improvement suggestions powered by Groq
 - **GitHub Integration** — Optionally link a GitHub account to enrich project context
-- **Mock Interviews** — Voice-only AI interview over WebSocket: two fixed questions (background + a project), spoken via Groq TTS, answers captured by voice-activity detection and transcribed server-side with Whisper
+- **Mock Interviews** — Voice-only AI interview over WebSocket. Questions are generated live from your resume, GitHub-enriched project data, and the job description — not scripted: a warmup, a deep dive into a real project by name/tech stack, and reasoning-focused technical questions ("why X over Y") grounded in what you actually built, with up to 2 follow-up probes per question. Pacing is driven by elapsed time against your chosen duration (not a fixed question count), spoken via Groq TTS, answers captured push-to-talk and transcribed server-side with Whisper
 - **Interview Reports** — Post-interview scoring and detailed feedback, saved to your account
 - **Auth** — JWT-based registration & login with protected routes
 
@@ -41,10 +41,9 @@ ResumeX1/
 │
 ├── server/                 # Express backend
 │   ├── routes/             # /api/parse, /api/analyze, /api/auth, /api/resumes, /api/interviews
-│   ├── services/           # GitHub API, AI services
+│   ├── services/           # Resume parsing, GitHub API, AI/LLM calls, TTS, session store, metrics
 │   ├── models/             # Mongoose models
 │   ├── middleware/         # Auth middleware
-│   ├── parser/             # PDF parsing logic
 │   ├── websocket/          # Interview WebSocket handler
 │   └── package.json
 │
@@ -81,6 +80,7 @@ MONGODB_URI=mongodb://localhost:27017/resumex
 JWT_SECRET=change_this_to_a_long_random_secret
 GITHUB_TOKEN=                  # Optional — enables private repos & higher rate limit
 CLIENT_URL=http://localhost:5173  # Optional — CORS whitelist (default: Vite dev server)
+REDIS_URL=                     # Optional — shared interview-session store (see below)
 ```
 
 ### 2. Install dependencies
@@ -122,6 +122,7 @@ Visit [http://localhost:5173](http://localhost:5173).
 | `JWT_SECRET` | ✅ | Secret for signing JWTs — keep this long and random |
 | `GITHUB_TOKEN` | ❌ | Personal access token for GitHub API (5000 req/hr vs 60) |
 | `CLIENT_URL` | ❌ | Frontend origin for CORS whitelist (default: `http://localhost:5173`) |
+| `REDIS_URL` | ❌ | Shared interview-session store. Without it, sessions live in-memory (single instance only, lost on restart). With it, sessions survive restarts and reconnects work across multiple server instances. |
 
 ---
 
@@ -136,7 +137,7 @@ Visit [http://localhost:5173](http://localhost:5173).
 | `GET` | `/api/resumes` | List saved resumes (auth required) |
 | `GET` | `/api/interviews` | List past interview reports (auth required) |
 | `GET` | `/api/interviews/:id` | Get a single interview report (auth required) |
-| `WS` | `/ws/interview?token=<jwt>` | Voice-only interview session — 2 fixed questions (JWT required) |
+| `WS` | `/ws/interview?token=<jwt>` | Voice-only interview session — adaptive question generation, time-paced (JWT required) |
 | `GET` | `/health` | Server health check |
 
 ---
